@@ -27,6 +27,7 @@ const userRoutes = require('./routes/users');
 const periodRoutes = require('./routes/periods');
 const topicRoutes = require('./routes/topics');
 const evaluationRoutes = require('./routes/evaluations');
+const uploadRoutes = require('./routes/uploads');
 
 // ใช้ Routes
 app.use('/api/auth', authRoutes);
@@ -34,6 +35,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/periods', periodRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/evaluations', evaluationRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Root route
 app.get('/', (req, res) => {
