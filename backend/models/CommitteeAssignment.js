@@ -1,53 +1,26 @@
 // backend/models/CommitteeAssignment.js
-// Model สำหรับจัดการการมอบหมายกรรมการ
+// Model สำหรับจัดการการมอบหมายกรรมการ 
 
 const db = require('../config/database');
 
 class CommitteeAssignment {
-  // ดึงการมอบหมายทั้งหมดในรอบการประเมิน
-  static async getByPeriodId(periodId) {
-    try {
-      const [rows] = await db.execute(`
-        SELECT 
-          ca.*,
-          committee.full_name as committee_name,
-          committee.email as committee_email,
-          committee.department as committee_department,
-          evaluatee.full_name as evaluatee_name,
-          evaluatee.email as evaluatee_email,
-          evaluatee.department as evaluatee_department,
-          assigner.full_name as assigned_by_name
-        FROM committee_assignments ca
-        JOIN users committee ON ca.committee_id = committee.id
-        JOIN users evaluatee ON ca.evaluatee_id = evaluatee.id
-        JOIN users assigner ON ca.assigned_by = assigner.id
-        WHERE ca.period_id = ?
-        ORDER BY committee.full_name ASC, evaluatee.full_name ASC
-      `, [periodId]);
-      
-      return rows;
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการดึงการมอบหมายกรรมการ: ' + error.message);
-    }
-  }
-
-  // ดึงผู้ที่กรรมการคนหนึ่งต้องประเมิน
-  static async getEvaluateesByCommittee(committeeId, periodId = null) {
+  // ดึงรายการมอบหมายของกรรมการ
+  static async getByCommittee(committeeId, periodId = null) {
     try {
       let query = `
         SELECT 
           ca.*,
           evaluatee.full_name as evaluatee_name,
-          evaluatee.email as evaluatee_email,
           evaluatee.department as evaluatee_department,
           evaluatee.position as evaluatee_position,
           ep.period_name,
-          ep.start_date,
-          ep.end_date,
-          ep.is_active as period_active
+          COUNT(ue.id) as total_criteria,
+          SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
+          SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count
         FROM committee_assignments ca
         JOIN users evaluatee ON ca.evaluatee_id = evaluatee.id
         JOIN evaluation_periods ep ON ca.period_id = ep.id
+        LEFT JOIN user_evaluations ue ON ca.evaluatee_id = ue.user_id AND ca.period_id = ue.period_id
         WHERE ca.committee_id = ?
       `;
       
@@ -58,27 +31,28 @@ class CommitteeAssignment {
         params.push(periodId);
       }
       
-      query += ' ORDER BY ep.start_date DESC, evaluatee.full_name ASC';
+      query += ' GROUP BY ca.id ORDER BY ca.role DESC, evaluatee.full_name ASC';
       
       const [rows] = await db.execute(query, params);
       return rows;
     } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการดึงรายการผู้รับการประเมิน: ' + error.message);
+      throw new Error('เกิดข้อผิดพลาดในการดึงรายการมอบหมาย: ' + error.message);
     }
   }
 
-  // ดึงกรรมการที่ประเมินผู้ใช้คนหนึ่ง
-  static async getCommitteesByEvaluatee(evaluateeId, periodId) {
+  // ดึงรายการกรรมการของผู้รับการประเมิน
+  static async getByEvaluatee(evaluateeId, periodId) {
     try {
       const [rows] = await db.execute(`
         SELECT 
           ca.*,
           committee.full_name as committee_name,
-          committee.email as committee_email,
           committee.department as committee_department,
-          committee.position as committee_position
+          committee.position as committee_position,
+          ep.period_name
         FROM committee_assignments ca
         JOIN users committee ON ca.committee_id = committee.id
+        JOIN evaluation_periods ep ON ca.period_id = ep.id
         WHERE ca.evaluatee_id = ? AND ca.period_id = ?
         ORDER BY ca.role DESC, committee.full_name ASC
       `, [evaluateeId, periodId]);
@@ -102,11 +76,6 @@ class CommitteeAssignment {
 
       if (existing.length > 0) {
         throw new Error('มีการมอบหมายกรรมการคนนี้ประเมินผู้ใช้คนนี้ในรอบการประเมินนี้แล้ว');
-      }
-
-      // ตรวจสอบว่าไม่ให้ประเมินตัวเอง
-      if (committee_id === evaluatee_id) {
-        throw new Error('ไม่สามารถมอบหมายให้ประเมินตัวเองได้');
       }
 
       const [result] = await db.execute(`
@@ -192,18 +161,6 @@ class CommitteeAssignment {
   // ลบการมอบหมาย
   static async delete(id) {
     try {
-      // ตรวจสอบว่ามีการประเมินแล้วหรือไม่
-      const [evaluations] = await db.execute(`
-        SELECT COUNT(*) as count 
-        FROM user_evaluations ue
-        JOIN committee_assignments ca ON ue.period_id = ca.period_id AND ue.user_id = ca.evaluatee_id
-        WHERE ca.id = ? AND ue.committee_evaluated_by = ca.committee_id
-      `, [id]);
-
-      if (evaluations[0].count > 0) {
-        throw new Error('ไม่สามารถลบการมอบหมายที่มีการประเมินแล้ว');
-      }
-
       const [result] = await db.execute(
         'DELETE FROM committee_assignments WHERE id = ?',
         [id]
@@ -215,94 +172,29 @@ class CommitteeAssignment {
     }
   }
 
-  // ลบการมอบหมายทั้งหมดในรอบการประเมิน
-  static async deleteByPeriod(periodId) {
-    try {
-      const [result] = await db.execute(
-        'DELETE FROM committee_assignments WHERE period_id = ?',
-        [periodId]
-      );
-      
-      return result.affectedRows;
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการลบการมอบหมายในรอบการประเมิน: ' + error.message);
-    }
-  }
-
-  // ค้นหาการมอบหมายตาม ID
-  static async findById(id) {
-    try {
-      const [rows] = await db.execute(`
-        SELECT 
-          ca.*,
-          committee.full_name as committee_name,
-          evaluatee.full_name as evaluatee_name,
-          ep.period_name
-        FROM committee_assignments ca
-        JOIN users committee ON ca.committee_id = committee.id
-        JOIN users evaluatee ON ca.evaluatee_id = evaluatee.id
-        JOIN evaluation_periods ep ON ca.period_id = ep.id
-        WHERE ca.id = ?
-      `, [id]);
-      
-      return rows[0] || null;
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการค้นหาการมอบหมาย: ' + error.message);
-    }
-  }
-
-  // สถิติการมอบหมาย
+  // ดึงสถิติการมอบหมาย
   static async getStatistics(periodId) {
     try {
       const [stats] = await db.execute(`
         SELECT 
+          COUNT(DISTINCT ca.committee_id) as total_committees,
+          COUNT(DISTINCT ca.evaluatee_id) as total_evaluatees,
           COUNT(*) as total_assignments,
-          COUNT(DISTINCT committee_id) as total_committees,
-          COUNT(DISTINCT evaluatee_id) as total_evaluatees,
-          SUM(CASE WHEN role = 'chairman' THEN 1 ELSE 0 END) as chairman_count,
-          SUM(CASE WHEN role = 'member' THEN 1 ELSE 0 END) as member_count
-        FROM committee_assignments
-        WHERE period_id = ?
-      `, [periodId]);
-
-      const [workload] = await db.execute(`
-        SELECT 
-          committee_id,
-          committee.full_name as committee_name,
-          COUNT(*) as evaluatee_count
+          SUM(CASE WHEN ca.role = 'chairman' THEN 1 ELSE 0 END) as chairman_count,
+          SUM(CASE WHEN ca.role = 'member' THEN 1 ELSE 0 END) as member_count
         FROM committee_assignments ca
-        JOIN users committee ON ca.committee_id = committee.id
         WHERE ca.period_id = ?
-        GROUP BY committee_id, committee.full_name
-        ORDER BY evaluatee_count DESC
       `, [periodId]);
 
-      return {
-        summary: stats[0] || {
-          total_assignments: 0,
-          total_committees: 0,
-          total_evaluatees: 0,
-          chairman_count: 0,
-          member_count: 0
-        },
-        workload_distribution: workload
+      return stats[0] || {
+        total_committees: 0,
+        total_evaluatees: 0,
+        total_assignments: 0,
+        chairman_count: 0,
+        member_count: 0
       };
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการดึงสถิติการมอบหมาย: ' + error.message);
-    }
-  }
-
-  // ตรวจสอบสิทธิ์กรรมการ
-  static async checkCommitteePermission(committeeId, evaluateeId, periodId) {
-    try {
-      const [rows] = await db.execute(
-        'SELECT role FROM committee_assignments WHERE committee_id = ? AND evaluatee_id = ? AND period_id = ?',
-        [committeeId, evaluateeId, periodId]
-      );
-      
-      return rows[0] || null;
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์กรรมการ: ' + error.message);
     }
   }
 }

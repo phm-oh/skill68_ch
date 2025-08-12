@@ -1,5 +1,5 @@
-// backend/server.js
-// ไฟล์หลักของเซิร์ฟเวอร์
+// backend/server.js - อัปเดตเพิ่ม Routes ใหม่
+// ไฟล์หลักของเซิร์ฟเวอร์ (ตามรูปแบบเดิม)
 
 const express = require('express');
 const cors = require('cors');
@@ -21,21 +21,25 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static files สำหรับอัปโหลด
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Import Routes
+// Import Routes (ตามรูปแบบเดิม)
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const periodRoutes = require('./routes/periods');
 const topicRoutes = require('./routes/topics');
 const evaluationRoutes = require('./routes/evaluations');
 const uploadRoutes = require('./routes/uploads');
+const committeeRoutes = require('./routes/committee');
+const reportRoutes = require('./routes/reports');
 
-// ใช้ Routes
+// ใช้ Routes (ตามรูปแบบเดิม)
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/periods', periodRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/committee', committeeRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -49,6 +53,9 @@ app.get('/', (req, res) => {
       periods: '/api/periods',
       topics: '/api/topics',
       evaluations: '/api/evaluations',
+      uploads: '/api/uploads',
+      committee: '/api/committee',
+      reports: '/api/reports',
       test_db: '/api/test-db'
     },
     test_accounts: {
@@ -120,11 +127,30 @@ app.get('/api', (req, res) => {
         submitEvaluation: 'POST /api/evaluations/submit/:periodId',
         committeeEvaluate: 'POST /api/evaluations/committee/:evaluationId',
         getMyScore: 'GET /api/evaluations/score/:periodId'
+      },
+      uploads: {
+        uploadEvidence: 'POST /api/uploads/evidence',
+        uploadProfile: 'POST /api/uploads/profile',
+        getFiles: 'GET /api/uploads/files',
+        downloadFile: 'GET /api/uploads/download/:filename'
+      },
+      committee: {
+        getMyAssignments: 'GET /api/committee/assignments (Committee)',
+        createAssignment: 'POST /api/committee/assignments (HR only)',
+        createBulk: 'POST /api/committee/assignments/bulk (HR only)',
+        updateRole: 'PUT /api/committee/assignments/:id/role (HR only)'
+      },
+      reports: {
+        userReport: 'GET /api/reports/user/:userId/:periodId',
+        periodReport: 'GET /api/reports/period/:periodId (HR/Committee)',
+        downloadReport: 'GET /api/reports/download/:type/:id?format=pdf'
       }
     },
     test_routes: {
       auth: '/api/auth/test',
       users: '/api/users/test/info',
+      committee: '/api/committee/test/info',
+      reports: '/api/reports/test/info',
       database: '/api/test-db'
     }
   });
@@ -152,13 +178,14 @@ app.use('*', (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🗄️  Database: ${process.env.DB_NAME}@${process.env.DB_HOST}`);
   console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN}`);
   console.log(`📁 Upload Directory: ${path.join(__dirname, 'uploads')}`);
   console.log('✅ Ready to accept requests!');
   console.log('📚 API Docs: http://localhost:' + PORT + '/api');
+  console.log('🧪 Test Routes: http://localhost:' + PORT + '/api/auth/test');
 });
 
 module.exports = app;
