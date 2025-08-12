@@ -1,0 +1,63 @@
+/* frontend-vite/src/style.css */
+/* Global CSS Reset และ Base Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f5f5f5;
+}
+
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+/* ปรับแต่ง scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Utility classes */
+.text-center { text-align: center; }
+.mt-2 { margin-top: 8px; }
+.mt-4 { margin-top: 16px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.p-2 { padding: 8px; }
+.p-4 { padding: 16px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px !important;
+  }
+  
+  .card {
+    padding: 20px !important;
+  }
+  
+  .actions {
+    flex-direction: column !important;
+  }
+}

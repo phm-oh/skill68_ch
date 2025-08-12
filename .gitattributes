@@ -1,0 +1,8 @@
+# ใช้ LF สำหรับทุกไฟล์ text
+* text=auto eol=lf
+
+# บางไฟล์ binary ไม่ต้องแปลง line endings
+*.png binary
+*.jpg binary
+*.zip binary
+*.exe binary
