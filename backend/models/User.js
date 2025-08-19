@@ -1,5 +1,5 @@
 // backend/models/User.js
-// Model สำหรับจัดการข้อมูลผู้ใช้
+// Model สำหรับจัดการข้อมูลผู้ใช้ (แก้ไขให้ใช้ is_active แทน status)
 
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
@@ -9,7 +9,7 @@ class User {
   static async findByUsername(username) {
     try {
       const [rows] = await db.execute(
-        'SELECT * FROM users WHERE username = ? AND status = "active"',
+        'SELECT * FROM users WHERE username = ? AND is_active = 1',
         [username]
       );
       return rows[0] || null;
@@ -22,7 +22,7 @@ class User {
   static async findById(id) {
     try {
       const [rows] = await db.execute(
-        'SELECT id, username, role, full_name, email, department, position, status, created_at FROM users WHERE id = ?',
+        'SELECT id, username, role, full_name, email, department, position, is_active, created_at FROM users WHERE id = ?',
         [id]
       );
       return rows[0] || null;
@@ -40,8 +40,8 @@ class User {
       const hashedPassword = await bcrypt.hash(password, 10);
       
       const [result] = await db.execute(
-        `INSERT INTO users (username, password, role, full_name, email, department, position) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (username, password, role, full_name, email, department, position, is_active) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
         [username, hashedPassword, role, full_name, email, department, position]
       );
       
@@ -70,7 +70,7 @@ class User {
   // รายการผู้ใช้ทั้งหมด (สำหรับ HR)
   static async getAll(role = null) {
     try {
-      let query = 'SELECT id, username, role, full_name, email, department, position, status, created_at FROM users WHERE status = "active"';
+      let query = 'SELECT id, username, role, full_name, email, department, position, is_active, created_at FROM users WHERE is_active = 1';
       let params = [];
       
       if (role) {
@@ -100,6 +100,51 @@ class User {
       return result.affectedRows > 0;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการอัปเดตข้อมูล: ' + error.message);
+    }
+  }
+
+  // เปิด/ปิดการใช้งานผู้ใช้
+  static async setActive(id, isActive) {
+    try {
+      const [result] = await db.execute(
+        'UPDATE users SET is_active = ? WHERE id = ?',
+        [isActive ? 1 : 0, id]
+      );
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw new Error('เกิดข้อผิดพลาดในการเปลี่ยนสถานะผู้ใช้: ' + error.message);
+    }
+  }
+
+  // ค้นหาผู้ใช้ด้วยอีเมล
+  static async findByEmail(email) {
+    try {
+      const [rows] = await db.execute(
+        'SELECT * FROM users WHERE email = ? AND is_active = 1',
+        [email]
+      );
+      return rows[0] || null;
+    } catch (error) {
+      throw new Error('เกิดข้อผิดพลาดในการค้นหาผู้ใช้: ' + error.message);
+    }
+  }
+
+  // นับจำนวนผู้ใช้ตาม role
+  static async countByRole(role = null) {
+    try {
+      let query = 'SELECT COUNT(*) as count FROM users WHERE is_active = 1';
+      let params = [];
+      
+      if (role) {
+        query += ' AND role = ?';
+        params.push(role);
+      }
+      
+      const [rows] = await db.execute(query, params);
+      return rows[0].count;
+    } catch (error) {
+      throw new Error('เกิดข้อผิดพลาดในการนับจำนวนผู้ใช้: ' + error.message);
     }
   }
 }
