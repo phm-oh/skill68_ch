@@ -1,4 +1,4 @@
-// src/router/index.js
+// frontend-viteV2/src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -24,6 +24,7 @@ const routes = [
     component: Register,
     meta: { requiresGuest: true }
   },
+  
   // HR Routes
   {
     path: '/hr',
@@ -37,6 +38,7 @@ const routes = [
     meta: { requiresAuth: true, role: 'hr' }
   },
   
+  // Evaluatee Routes
   {
     path: '/evaluatee',
     redirect: '/evaluatee/dashboard',
@@ -49,17 +51,24 @@ const routes = [
     meta: { requiresAuth: true, role: 'evaluatee' }
   },
   
-  // {
-  //   path: '/committee',
-  //   redirect: '/committee/dashboard',
-  //   meta: { requiresAuth: true, role: 'committee' }
-  // },
-  // {
-  //   path: '/committee/dashboard',
-  //   name: 'committee-dashboard',
-  //   component: () => import('../views/committee/Dashboard.vue'),
-  //   meta: { requiresAuth: true, role: 'committee' }
-  // }
+  // Committee Routes
+  {
+    path: '/committee',
+    redirect: '/committee/dashboard',
+    meta: { requiresAuth: true, role: 'committee' }
+  },
+  {
+    path: '/committee/dashboard',
+    name: 'committee-dashboard',
+    component: () => import('../views/committee/Dashboard.vue'),
+    meta: { requiresAuth: true, role: 'committee' }
+  },
+
+  // 404 Fallback
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/login'
+  }
 ]
 
 const router = createRouter({
