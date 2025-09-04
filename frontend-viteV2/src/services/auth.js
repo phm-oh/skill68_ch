@@ -13,11 +13,20 @@ class AuthService {
       if (response.success) {
         // บันทึก token
         localStorage.setItem('token', response.data.token)
-        // บันทึกข้อมูลผู้ใช้
         localStorage.setItem('user', JSON.stringify(response.data.user))
         return response
       }
 
+      return response
+    } catch (error) {
+      return error
+    }
+  }
+
+  // สมัครสมาชิก (ใหม่)
+  async register(userData) {
+    try {
+      const response = await api.post('/auth/register-self', userData)
       return response
     } catch (error) {
       return error
@@ -29,10 +38,8 @@ class AuthService {
     try {
       await api.post('/auth/logout')
     } catch (error) {
-      // ไม่สำคัญถ้า logout API fail
       console.log('Logout API error:', error)
     } finally {
-      // ลบข้อมูลออกจาก localStorage ทุกกรณี
       localStorage.removeItem('token')
       localStorage.removeItem('user')
     }

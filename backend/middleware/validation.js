@@ -151,9 +151,47 @@ const validateCriteria = [
   handleValidationErrors
 ];
 
+const validateRegisterSelf = [
+  body('username')
+    .notEmpty()
+    .withMessage('กรุณากรอกชื่อผู้ใช้')
+    .isLength({ min: 3, max: 50 })
+    .withMessage('ชื่อผู้ใช้ต้องมี 3-50 ตัวอักษร')
+    .matches(/^[a-zA-Z0-9._-]+$/)
+    .withMessage('ชื่อผู้ใช้สามารถใช้ได้เฉพาะ a-z, A-Z, 0-9, ., _, -'),
+  
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'),
+  
+  body('full_name')
+    .notEmpty()
+    .withMessage('กรุณากรอกชื่อ-นามสกุล')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('ชื่อ-นามสกุลต้องมี 2-100 ตัวอักษร'),
+  
+  body('email')
+    .notEmpty()
+    .withMessage('กรุณากรอกอีเมล')
+    .isEmail()
+    .withMessage('รูปแบบอีเมลไม่ถูกต้อง')
+    .normalizeEmail(),
+  
+  body('department')
+    .notEmpty()
+    .withMessage('กรุณากรอกแผนก/หน่วยงาน'),
+  
+  body('position')
+    .notEmpty()
+    .withMessage('กรุณากรอกตำแหน่งงาน'),
+  
+  handleValidationErrors
+];
+
 module.exports = {
   validateLogin,
   validateRegister,
+  validateRegisterSelf, 
   validatePeriod,
   validateTopic,
   validateCriteria,

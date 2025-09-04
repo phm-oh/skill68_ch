@@ -1,6 +1,7 @@
-// src/router/index.js - แบบง่าย ไม่มี routes ที่ไม่มีไฟล์
+// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
+import Register from '../views/Register.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -13,8 +14,13 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: Login
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: Register
     }
-    // จะเพิ่ม routes อื่นทีละตัวเมื่อสร้างไฟล์แล้ว
+    // เพิ่ม routes อื่นทีละตัวเมื่อสร้างไฟล์แล้ว
   ]
 })
 

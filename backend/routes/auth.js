@@ -7,7 +7,7 @@ const router = express.Router();
 // Import Controllers และ Middleware
 const authController = require('../controllers/authController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { validateLogin, validateRegister } = require('../middleware/validation');
+const { validateLogin, validateRegister ,validateRegisterSelf } = require('../middleware/validation');
 
 // Route: POST /api/auth/login
 // เข้าสู่ระบบ
@@ -21,6 +21,7 @@ router.post('/register',
   validateRegister, 
   authController.register
 );
+router.post('/register-self', validateRegisterSelf, authController.registerSelf);
 
 // Route: GET /api/auth/me
 // ดึงข้อมูลผู้ใช้ปัจจุบัน
@@ -42,6 +43,7 @@ router.get('/test', (req, res) => {
     endpoints: {
       login: 'POST /api/auth/login',
       register: 'POST /api/auth/register (HR only)',
+      registerSelf: 'POST /api/auth/register-self (Public)',  // เพิ่มนี้
       me: 'GET /api/auth/me',
       logout: 'POST /api/auth/logout',
       changePassword: 'POST /api/auth/change-password'

@@ -160,9 +160,54 @@ const changePassword = async (req, res) => {
   }
 };
 
+const registerSelf = async (req, res) => {
+  try {
+    const { username, password, full_name, email, department, position } = req.body;
+
+    // ตรวจสอบว่า username มีอยู่แล้วหรือไม่
+    const existingUser = await User.findByUsername(username);
+    if (existingUser) {
+      return badRequest(res, 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว');
+    }
+
+    // สร้างผู้ใช้ใหม่ (role เป็น 'evaluatee' เสมอ)
+    const newUser = await User.create({
+      username,
+      password,
+      role: 'evaluatee',
+      full_name,
+      email,
+      department,
+      position
+    });
+
+    return success(res, {
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        role: newUser.role,
+        full_name: newUser.full_name,
+        email: newUser.email,
+        department: newUser.department,
+        position: newUser.position
+      }
+    }, 'สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ', 201);
+
+  } catch (err) {
+    console.error('Register self error:', err);
+    
+    if (err.message.includes('มีอยู่ในระบบแล้ว')) {
+      return badRequest(res, err.message);
+    }
+    
+    return error(res, 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
+  }
+};
+
 module.exports = {
   login,
   register,
+  registerSelf,
   getCurrentUser,
   logout,
   changePassword
