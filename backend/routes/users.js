@@ -1,5 +1,5 @@
 // backend/routes/users.js
-// Routes สำหรับจัดการผู้ใช้
+// Routes สำหรับจัดการผู้ใช้ (แก้ไขเพิ่ม role filtering)
 
 const express = require('express');
 const router = express.Router();
@@ -38,18 +38,36 @@ const validateUserUpdate = [
 
 // Validation สำหรับการเปลี่ยนสถานะ
 const validateStatusUpdate = [
-  body('status')
-    .isIn(['active', 'inactive'])
-    .withMessage('สถานะต้องเป็น active หรือ inactive'),
+  body('is_active')
+    .isBoolean()
+    .withMessage('สถานะต้องเป็น true หรือ false'),
   
   handleValidationErrors
 ];
 
-// Route: GET /api/users
-// ดึงรายการผู้ใช้ทั้งหมด (เฉพาะ HR)
+// 🔥 Route: GET /api/users
+// ดึงรายการผู้ใช้ทั้งหมด พร้อม Role Filtering (แก้ไขใหม่)
 router.get('/', 
   authenticateToken, 
-  requireRole('hr'), 
+  requireRole(['hr', 'committee']),
+  (req, res, next) => {
+    // เพิ่ม role filter จาก query parameter
+    const { role } = req.query;
+    
+    // ตรวจสอบ role ที่ถูกต้อง
+    const validRoles = ['hr', 'evaluatee', 'committee'];
+    if (role && !validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role ที่ระบุไม่ถูกต้อง',
+        valid_roles: validRoles
+      });
+    }
+    
+    // ส่งต่อไปยัง controller
+    req.roleFilter = role;
+    next();
+  },
   userController.getAllUsers
 );
 
@@ -129,16 +147,24 @@ router.get('/test/info', (req, res) => {
     success: true,
     message: '👥 User routes working!',
     endpoints: {
-      getAllUsers: 'GET /api/users (HR only)',
+      getAllUsers: 'GET /api/users (HR/Committee)',
+      getAllWithRole: 'GET /api/users?role=committee (HR/Committee)',
       searchUsers: 'GET /api/users/search?q=keyword&role=hr (HR/Committee)',
       getUserById: 'GET /api/users/:id',
       updateUser: 'PUT /api/users/:id',
       updateStatus: 'PATCH /api/users/:id/status (HR only)',
       deleteUser: 'DELETE /api/users/:id (HR only)'
     },
+    role_filtering: {
+      all_users: 'GET /api/users',
+      committee_only: 'GET /api/users?role=committee',
+      evaluatee_only: 'GET /api/users?role=evaluatee',
+      hr_only: 'GET /api/users?role=hr'
+    },
+    valid_roles: ['hr', 'evaluatee', 'committee'],
     permissions: {
-      hr: 'จัดการผู้ใช้ได้ทุกคน',
-      committee: 'ค้นหาและดูข้อมูลผู้ใช้ได้',
+      hr: 'จัดการผู้ใช้ได้ทุกคน, ดูทุก role',
+      committee: 'ค้นหาและดูข้อมูลผู้ใช้ได้, ดูทุก role',
       evaluatee: 'ดูและแก้ไขข้อมูลตัวเองได้เท่านั้น'
     }
   });

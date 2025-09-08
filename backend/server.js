@@ -70,7 +70,7 @@ app.get('/', (req, res) => {
 app.get('/api/test-db', async (req, res) => {
   try {
     const db = require('./config/database');
-    const [rows] = await db.execute('SELECT COUNT(*) as user_count FROM users WHERE status = "active"');
+    const [rows] = await db.execute('SELECT COUNT(*) as user_count FROM users WHERE is_active = 1');
     res.json({
       success: true,
       message: '✅ Database connected successfully!',

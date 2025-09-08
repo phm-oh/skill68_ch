@@ -1,5 +1,5 @@
 // backend/routes/committee.js
-// Routes สำหรับการมอบหมายกรรมการ 
+// Routes สำหรับการมอบหมายกรรมการ - แก้ไข Error
 
 const express = require('express');
 const router = express.Router();
@@ -58,10 +58,17 @@ const validateBulkAssignment = [
 ];
 
 // Route: GET /api/committee/assignments
-// ดึงรายการมอบหมายของตนเอง (สำหรับกรรมการ)
+// รองรับทั้งกรรมการ (ดูตัวเอง) และ HR (ดูทั้งหมดถ้ามี period_id)
 router.get('/assignments', 
   authenticateToken,
-  requireRole('committee'),
+  (req, res, next) => {
+    // ถ้าเป็น HR และมี period_id query parameter
+    if (req.user.role === 'hr' && req.query.period_id) {
+      req.isHRWithPeriod = true;
+      req.periodFilter = req.query.period_id;
+    }
+    next();
+  },
   committeeController.getMyAssignments
 );
 
@@ -128,7 +135,8 @@ router.get('/test/info', (req, res) => {
     success: true,
     message: '👨‍⚖️ Committee routes working!',
     endpoints: {
-      getMyAssignments: 'GET /api/committee/assignments (Committee only)',
+      getMyAssignments: 'GET /api/committee/assignments (Committee)',
+      getWithFilter: 'GET /api/committee/assignments?period_id=123 (HR)',
       getByEvaluatee: 'GET /api/committee/evaluatee/:evaluateeId/:periodId',
       createAssignment: 'POST /api/committee/assignments (HR only)',
       createBulk: 'POST /api/committee/assignments/bulk (HR only)',
@@ -136,16 +144,15 @@ router.get('/test/info', (req, res) => {
       deleteAssignment: 'DELETE /api/committee/assignments/:id (HR only)',
       getStats: 'GET /api/committee/stats/:periodId (HR only)'
     },
+    usage: {
+      committee_view: 'GET /api/committee/assignments',
+      hr_filtered_view: 'GET /api/committee/assignments?period_id=123'
+    },
     sample_assignment: {
       committee_id: 3,
       evaluatee_id: 2,
       period_id: 1,
       role: 'member'
-    },
-    sample_bulk_assignment: {
-      committee_ids: [3, 4, 5],
-      evaluatee_ids: [2, 6, 7],
-      period_id: 1
     },
     permissions: {
       committee: 'ดูรายการมอบหมายตนเอง',

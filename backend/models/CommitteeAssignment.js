@@ -197,6 +197,28 @@ class CommitteeAssignment {
       throw new Error('เกิดข้อผิดพลาดในการดึงสถิติการมอบหมาย: ' + error.message);
     }
   }
+
+  static async getAllByPeriod(periodId) {
+  try {
+    const [rows] = await db.execute(`
+      SELECT ca.*, 
+        c.full_name as committee_name,
+        e.full_name as evaluatee_name,
+        e.department as evaluatee_department,
+        p.period_name
+      FROM committee_assignments ca
+      LEFT JOIN users c ON ca.committee_id = c.id
+      LEFT JOIN users e ON ca.evaluatee_id = e.id  
+      LEFT JOIN evaluation_periods p ON ca.period_id = p.id
+      WHERE ca.period_id = ?
+      ORDER BY ca.assigned_at DESC
+    `, [periodId]);
+    
+    return rows;
+  } catch (error) {
+    throw error;
+  }
+}
 }
 
 module.exports = CommitteeAssignment;

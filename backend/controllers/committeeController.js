@@ -1,25 +1,47 @@
 // backend/controllers/committeeController.js
-// Controller สำหรับจัดการการมอบหมายกรรมการ 
+// Controller สำหรับจัดการการมอบหมายกรรมการ (แก้ไข getMyAssignments)
 
 const CommitteeAssignment = require('../models/CommitteeAssignment');
 const { success, error, notFound, badRequest } = require('../utils/responseHelper');
 
-// ดึงรายการผู้ที่ได้รับมอบหมายให้ประเมิน (สำหรับกรรมการ)
+// ดึงรายการผู้ที่ได้รับมอบหมายให้ประเมิน (สำหรับกรรมการ) หรือทั้งหมด (สำหรับ HR)
 const getMyAssignments = async (req, res) => {
   try {
     const { periodId } = req.query;
-    const committeeId = req.user.id;
+    const currentUserId = req.user.id;
+    const userRole = req.user.role;
 
-    const assignments = await CommitteeAssignment.getByCommittee(committeeId, periodId);
-    
-    return success(res, {
-      assignments: assignments,
-      total: assignments.length,
-      committee_id: committeeId
-    }, 'ดึงรายการมอบหมายสำเร็จ');
+    // 🔥 ตรวจสอบว่าเป็น HR ที่ต้องการดูข้อมูลทั้งหมด หรือกรรมการที่ดูแค่ตัวเอง
+    if (userRole === 'hr' && (req.isHRWithPeriod || req.periodFilter)) {
+      // HR ดูการมอบหมายทั้งหมดในรอบที่กำหนด
+      console.log('HR requesting all assignments for period:', req.periodFilter || periodId);
+      
+      const allAssignments = await CommitteeAssignment.getAllByPeriod(req.periodFilter || periodId);
+      
+      return success(res, {
+        assignments: allAssignments,
+        total: allAssignments.length,
+        period_id: req.periodFilter || periodId,
+        view_type: 'hr_all_assignments'
+      }, 'ดึงรายการมอบหมายทั้งหมดสำเร็จ');
+      
+    } else {
+      // กรรมการดูการมอบหมายของตัวเองเท่านั้น
+      console.log('Committee requesting own assignments:', currentUserId);
+      
+      const assignments = await CommitteeAssignment.getByCommittee(currentUserId, periodId);
+      
+      return success(res, {
+        assignments: assignments,
+        total: assignments.length,
+        committee_id: currentUserId,
+        period_id: periodId,
+        view_type: 'committee_own_assignments'
+      }, 'ดึงรายการมอบหมายสำเร็จ');
+    }
 
   } catch (err) {
-    console.error('Get my assignments error:', err);
+    console.error('Get assignments error:', err);
     return error(res, 'เกิดข้อผิดพลาดในการดึงรายการมอบหมาย');
   }
 };

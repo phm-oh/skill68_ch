@@ -1,302 +1,254 @@
 <!-- frontend-viteV2/src/components/hr/CommitteeAssignment.vue -->
 <template>
   <v-container>
-    <!-- Header -->
-    <div class="d-flex justify-space-between align-center mb-4">
-      <h2>มอบหมายกรรมการ</h2>
-      <v-btn color="primary" @click="openAssignmentDialog()">
-        <v-icon left>mdi-account-tie</v-icon>
-        มอบหมายใหม่
-      </v-btn>
-    </div>
+    <h2 class="mb-4">มอบหมายกรรมการประเมิน</h2>
+
+    <v-alert v-if="error" type="error" class="mb-4" closable @click:close="error = null">
+      {{ error }}
+    </v-alert>
+
+    <v-alert v-if="successMessage" type="success" class="mb-4" closable @click:close="successMessage = null">
+      {{ successMessage }}
+    </v-alert>
 
     <!-- Period Selection -->
     <v-card class="mb-4">
-      <v-card-title>เลือกรอบการประเมิน</v-card-title>
       <v-card-text>
         <v-select
           v-model="selectedPeriod"
           :items="periods"
           item-title="period_name"
           item-value="id"
-          label="รอบการประเมิน"
+          label="เลือกรอบการประเมิน"
           variant="outlined"
+          density="compact"
           @update:modelValue="loadAssignments"
         />
       </v-card-text>
     </v-card>
 
-    <!-- Assignments Table -->
-    <v-card v-if="selectedPeriod">
-      <v-card-title>รายการมอบหมาย</v-card-title>
-      <v-data-table
-        :headers="headers"
-        :items="assignments"
-        :loading="loading"
-        class="elevation-1"
-      >
-        <!-- Role Column -->
-        <template v-slot:item.role="{ item }">
-          <v-chip :color="item.role === 'chairman' ? 'orange' : 'blue'" small>
-            {{ item.role === 'chairman' ? 'ประธาน' : 'กรรมการ' }}
-          </v-chip>
-        </template>
+    <div v-if="selectedPeriod">
+      <div class="d-flex justify-space-between align-center mb-4">
+        <h3>การมอบหมาย</h3>
+        <v-btn color="primary" @click="openAssignDialog()">
+          <v-icon left>mdi-plus</v-icon>
+          มอบหมายใหม่
+        </v-btn>
+      </div>
 
-        <!-- Actions Column -->
-        <template v-slot:item.actions="{ item }">
-          <v-btn icon size="small" color="red" @click="deleteAssignment(item.id)">
-            <v-icon>mdi-delete</v-icon>
-          </v-btn>
-        </template>
-      </v-data-table>
-    </v-card>
+      <v-card v-if="assignments.length > 0">
+        <v-table>
+          <thead>
+            <tr>
+              <th>กรรมการ</th>
+              <th>ผู้รับการประเมิน</th>
+              <th>บทบาท</th>
+              <th>วันที่มอบหมาย</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="assignment in assignments" :key="assignment.id">
+              <td>{{ assignment.committee_name }}</td>
+              <td>{{ assignment.evaluatee_name }}</td>
+              <td>
+                <v-chip :color="assignment.role === 'chairman' ? 'red' : 'blue'" size="small">
+                  {{ assignment.role === 'chairman' ? 'ประธาน' : 'กรรมการ' }}
+                </v-chip>
+              </td>
+              <td>{{ formatDate(assignment.assigned_at) }}</td>
+              <td>
+                <v-btn icon size="small" color="red" @click="deleteAssignment(assignment.id)">
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card>
+
+      <div v-else-if="!loading" class="text-center py-8">
+        <v-icon size="48" color="grey">mdi-account-group</v-icon>
+        <p class="mt-2">ยังไม่มีการมอบหมายกรรมการ</p>
+      </div>
+    </div>
 
     <!-- Assignment Dialog -->
-    <v-dialog v-model="assignmentDialog" max-width="800px">
+    <v-dialog v-model="assignDialog" max-width="500px">
       <v-card>
-        <v-card-title>มอบหมายกรรมการ</v-card-title>
-
+        <v-card-title>มอบหมายกรรมการประเมิน</v-card-title>
         <v-card-text>
-          <!-- Period Selection in Dialog -->
           <v-select
-            v-model="assignmentForm.period_id"
-            :items="periods"
-            item-title="period_name"
+            v-model="assignForm.committee_id"
+            :items="committees"
+            item-title="full_name"
             item-value="id"
-            label="รอบการประเมิน"
+            label="เลือกกรรมการ"
             variant="outlined"
-            required
+            density="compact"
           />
-
-          <!-- Assignment Type -->
-          <v-radio-group v-model="assignmentType" inline>
-            <v-radio label="มอบหมายรายคน" value="single" />
-            <v-radio label="มอบหมายหลายคน" value="bulk" />
-          </v-radio-group>
-
-          <!-- Single Assignment -->
-          <div v-if="assignmentType === 'single'">
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-autocomplete
-                  v-model="assignmentForm.committee_id"
-                  :items="committeeUsers"
-                  item-title="full_name"
-                  item-value="id"
-                  label="กรรมการ"
-                  variant="outlined"
-                  required
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-autocomplete
-                  v-model="assignmentForm.evaluatee_id"
-                  :items="evaluateeUsers"
-                  item-title="full_name"
-                  item-value="id"
-                  label="ผู้รับการประเมิน"
-                  variant="outlined"
-                  required
-                />
-              </v-col>
-            </v-row>
-
-            <v-select
-              v-model="assignmentForm.role"
-              :items="[
-                { title: 'กรรมการ', value: 'member' },
-                { title: 'ประธานกรรมการ', value: 'chairman' }
-              ]"
-              label="บทบาท"
-              variant="outlined"
-              required
-            />
-          </div>
-
-          <!-- Bulk Assignment -->
-          <div v-if="assignmentType === 'bulk'">
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-autocomplete
-                  v-model="bulkForm.committee_ids"
-                  :items="committeeUsers"
-                  item-title="full_name"
-                  item-value="id"
-                  label="กรรมการ (เลือกหลายคน)"
-                  variant="outlined"
-                  multiple
-                  chips
-                  required
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-autocomplete
-                  v-model="bulkForm.evaluatee_ids"
-                  :items="evaluateeUsers"
-                  item-title="full_name"
-                  item-value="id"
-                  label="ผู้รับการประเมิน (เลือกหลายคน)"
-                  variant="outlined"
-                  multiple
-                  chips
-                  required
-                />
-              </v-col>
-            </v-row>
-
-            <v-alert type="info" class="mb-3">
-              <strong>การมอบหมายแบบกลุ่ม:</strong> กรรมการทุกคนที่เลือก จะได้รับมอบหมายให้ประเมินผู้รับการประเมินทุกคนที่เลือก
-            </v-alert>
-          </div>
+          
+          <v-select
+            v-model="assignForm.evaluatee_id"
+            :items="evaluatees"
+            item-title="full_name"
+            item-value="id"
+            label="เลือกผู้รับการประเมิน"
+            variant="outlined"
+            density="compact"
+          />
+          
+          <v-select
+            v-model="assignForm.role"
+            :items="roles"
+            label="บทบาท"
+            variant="outlined"
+            density="compact"
+          />
         </v-card-text>
-
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="assignmentDialog = false">ยกเลิก</v-btn>
-          <v-btn color="primary" @click="saveAssignment" :loading="saving">
-            มอบหมาย
-          </v-btn>
+          <v-btn @click="assignDialog = false">ยกเลิก</v-btn>
+          <v-btn color="primary" @click="saveAssignment" :loading="saving">บันทึก</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-overlay v-model="loading" contained>
+      <v-progress-circular indeterminate size="64" />
+    </v-overlay>
   </v-container>
 </template>
 
 <script>
-import periodService from '../../services/periodService.js'
-import userService from '../../services/userService.js'
+import api from '../../services/api.js'
 
 export default {
   name: 'CommitteeAssignment',
+  
   data() {
     return {
       selectedPeriod: null,
       periods: [],
       assignments: [],
-      committeeUsers: [],
-      evaluateeUsers: [],
-      
+      committees: [],
+      evaluatees: [],
       loading: false,
       saving: false,
-      assignmentDialog: false,
-      assignmentType: 'single',
-
-      // Forms
-      assignmentForm: {
-        period_id: null,
+      error: null,
+      successMessage: null,
+      assignDialog: false,
+      
+      assignForm: {
         committee_id: null,
         evaluatee_id: null,
         role: 'member'
       },
-
-      bulkForm: {
-        period_id: null,
-        committee_ids: [],
-        evaluatee_ids: []
-      },
-
-      // Table headers
-      headers: [
-        { title: 'กรรมการ', value: 'committee_name' },
-        { title: 'แผนกกรรมการ', value: 'committee_department' },
-        { title: 'ผู้รับการประเมิน', value: 'evaluatee_name' },
-        { title: 'แผนกผู้รับประเมิน', value: 'evaluatee_department' },
-        { title: 'บทบาท', value: 'role' },
-        { title: 'วันที่มอบหมาย', value: 'assigned_at' },
-        { title: 'จัดการ', value: 'actions', sortable: false }
+      
+      roles: [
+        { title: 'ประธานกรรมการ', value: 'chairman' },
+        { title: 'กรรมการ', value: 'member' }
       ]
     }
   },
-
-  mounted() {
-    this.loadPeriods()
-    this.loadUsers()
+  
+  async mounted() {
+    await this.loadPeriods()
+    await this.loadUsers()
   },
-
+  
   methods: {
     async loadPeriods() {
       try {
-        const response = await periodService.getPeriods()
-        this.periods = response.data || []
+        const response = await api.get('/periods')
+        if (response.success) {
+          this.periods = response.data.periods || []
+        }
       } catch (error) {
-        console.error('Error loading periods:', error)
+        this.error = 'ไม่สามารถโหลดรอบการประเมินได้'
       }
     },
 
     async loadUsers() {
       try {
-        // Load committee members
-        const committeeResponse = await userService.getUsers({ role: 'committee' })
-        this.committeeUsers = committeeResponse.data || []
-
-        // Load evaluatees
-        const evaluateeResponse = await userService.getUsers({ role: 'evaluatee' })
-        this.evaluateeUsers = evaluateeResponse.data || []
+        const [committeeRes, evaluateeRes] = await Promise.all([
+          api.get('/users?role=committee'),
+          api.get('/users?role=evaluatee')
+        ])
+        
+        if (committeeRes.success) {
+          this.committees = committeeRes.data || []
+        }
+        if (evaluateeRes.success) {
+          this.evaluatees = evaluateeRes.data || []
+        }
       } catch (error) {
-        console.error('Error loading users:', error)
+        this.error = 'ไม่สามารถโหลดรายชื่อผู้ใช้ได้'
       }
     },
 
     async loadAssignments() {
       if (!this.selectedPeriod) return
-
+      
       this.loading = true
       try {
-        // Note: This endpoint might need to be modified to filter by period
-        const response = await userService.getCommitteeAssignments()
-        this.assignments = response.data || []
+        const response = await api.get(`/committee/assignments?period_id=${this.selectedPeriod}`)
+        if (response.success) {
+          this.assignments = response.data || []
+        }
       } catch (error) {
-        console.error('Error loading assignments:', error)
+        this.error = 'ไม่สามารถโหลดการมอบหมายได้'
       } finally {
         this.loading = false
       }
     },
 
-    openAssignmentDialog() {
-      this.assignmentType = 'single'
-      this.assignmentForm = {
-        period_id: this.selectedPeriod,
+    openAssignDialog() {
+      this.assignForm = {
         committee_id: null,
         evaluatee_id: null,
         role: 'member'
       }
-      this.bulkForm = {
-        period_id: this.selectedPeriod,
-        committee_ids: [],
-        evaluatee_ids: []
-      }
-      this.assignmentDialog = true
+      this.assignDialog = true
     },
 
     async saveAssignment() {
+      if (!this.assignForm.committee_id || !this.assignForm.evaluatee_id) {
+        this.error = 'กรุณาเลือกกรรมการและผู้รับการประเมิน'
+        return
+      }
+
       this.saving = true
       try {
-        if (this.assignmentType === 'single') {
-          await userService.createCommitteeAssignment(this.assignmentForm)
-        } else {
-          // Bulk assignment
-          this.bulkForm.period_id = this.assignmentForm.period_id
-          await userService.createBulkAssignments(this.bulkForm)
-        }
+        await api.post('/committee/assignments', {
+          ...this.assignForm,
+          period_id: this.selectedPeriod
+        })
         
-        this.assignmentDialog = false
-        this.loadAssignments()
+        this.assignDialog = false
+        this.successMessage = 'มอบหมายกรรมการสำเร็จ'
+        await this.loadAssignments()
       } catch (error) {
-        console.error('Error saving assignment:', error)
+        this.error = 'ไม่สามารถมอบหมายกรรมการได้'
       } finally {
         this.saving = false
       }
     },
 
     async deleteAssignment(assignmentId) {
-      if (confirm('คุณแน่ใจหรือไม่ที่จะยกเลิกการมอบหมายนี้?')) {
-        try {
-          await userService.deleteCommitteeAssignment(assignmentId)
-          this.loadAssignments()
-        } catch (error) {
-          console.error('Error deleting assignment:', error)
-        }
+      if (!confirm('คุณแน่ใจหรือไม่ที่จะยกเลิกการมอบหมายนี้?')) return
+
+      try {
+        await api.delete(`/committee/assignments/${assignmentId}`)
+        this.successMessage = 'ยกเลิกการมอบหมายสำเร็จ'
+        await this.loadAssignments()
+      } catch (error) {
+        this.error = 'ไม่สามารถยกเลิกการมอบหมายได้'
       }
+    },
+
+    formatDate(dateString) {
+      return new Date(dateString).toLocaleDateString('th-TH')
     }
   }
 }

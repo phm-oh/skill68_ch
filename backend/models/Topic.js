@@ -5,19 +5,61 @@ const db = require('../config/database');
 
 class Topic {
   // ดึงหัวข้อทั้งหมดในรอบการประเมิน
-  static async getByPeriodId(periodId) {
-    try {
-      const [rows] = await db.execute(`
-        SELECT * FROM evaluation_topics 
-        WHERE period_id = ? 
-        ORDER BY sort_order ASC, id ASC
-      `, [periodId]);
+ // แก้ไขใน backend/models/Topic.js - วิธีง่าย
+
+// เปลี่ยน method getByPeriodId ให้ดึง criteria มาด้วย (วิธีง่าย)
+static async getByPeriodId(periodId) {
+  try {
+    console.log('🔍 Getting topics with criteria for period:', periodId);
+    
+    // 1. ดึง topics ก่อน
+    const [topicRows] = await db.execute(`
+      SELECT * FROM evaluation_topics 
+      WHERE period_id = ? 
+      ORDER BY sort_order ASC, id ASC
+    `, [periodId]);
+    
+    console.log('📋 Found topics:', topicRows.length);
+    
+    // 2. ดึง criteria สำหรับแต่ละ topic แยกกัน
+    for (let topic of topicRows) {
+      console.log(`🔍 Getting criteria for topic ${topic.id}: "${topic.topic_name}"`);
       
-      return rows;
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการดึงหัวข้อการประเมิน: ' + error.message);
+      // ดึง criteria
+      const [criteriaRows] = await db.execute(`
+        SELECT * FROM evaluation_criteria 
+        WHERE topic_id = ? 
+        ORDER BY sort_order ASC, id ASC
+      `, [topic.id]);
+      
+      // ดึง options สำหรับแต่ละ criteria
+      for (let criteria of criteriaRows) {
+        const [optionRows] = await db.execute(`
+          SELECT * FROM evaluation_options 
+          WHERE criteria_id = ? 
+          ORDER BY sort_order ASC, option_value ASC
+        `, [criteria.id]);
+        
+        criteria.options = optionRows;
+      }
+      
+      topic.criteria = criteriaRows;
+      console.log(`✅ Topic "${topic.topic_name}": ${criteriaRows.length} criteria`);
+      
+      // Debug: แสดงรายละเอียด criteria
+      criteriaRows.forEach((criteria, index) => {
+        console.log(`   ${index + 1}. ${criteria.criteria_name} (${criteria.options.length} options)`);
+      });
     }
+    
+    console.log('✅ All topics with criteria loaded successfully');
+    return topicRows;
+    
+  } catch (error) {
+    console.error('❌ Error in getByPeriodId:', error);
+    throw new Error('เกิดข้อผิดพลาดในการดึงหัวข้อการประเมิน: ' + error.message);
   }
+}
 
   // ดึงหัวข้อตาม ID พร้อมตัวชี้วัด
   static async findById(id) {

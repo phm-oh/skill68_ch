@@ -1,5 +1,5 @@
 // backend/routes/evaluations.js
-// Routes สำหรับจัดการการประเมิน
+// Routes สำหรับจัดการการประเมิน (แก้ไขเพิ่ม alias routes)
 
 const express = require('express');
 const router = express.Router();
@@ -110,6 +110,20 @@ router.get('/review/:userId/:periodId',
   evaluationController.getEvaluationForReview
 );
 
+// 🔥 ALIAS ROUTE สำหรับ Frontend ที่เรียก committee/:evaluateeId/:periodId
+// Route: GET /api/evaluations/committee/:evaluateeId/:periodId
+// Alias สำหรับ review route
+router.get('/committee/:evaluateeId/:periodId', 
+  authenticateToken,
+  requireRole(['committee', 'hr']),
+  (req, res, next) => {
+    // Redirect ไปยัง review route
+    req.params.userId = req.params.evaluateeId;
+    next();
+  },
+  evaluationController.getEvaluationForReview
+);
+
 // Route: POST /api/evaluations/committee/:evaluationId
 // ประเมินโดยกรรมการ
 router.post('/committee/:evaluationId', 
@@ -177,6 +191,7 @@ router.get('/test/info', (req, res) => {
       committee: {
         getAssignments: 'GET /api/evaluations/assignments',
         reviewEvaluation: 'GET /api/evaluations/review/:userId/:periodId',
+        reviewEvaluationAlias: 'GET /api/evaluations/committee/:evaluateeId/:periodId (ALIAS)',
         evaluate: 'POST /api/evaluations/committee/:evaluationId',
         approve: 'POST /api/evaluations/approve'
       },
