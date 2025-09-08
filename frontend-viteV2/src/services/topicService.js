@@ -1,96 +1,106 @@
-// frontend-viteV2/src/services/topicService.js
+// frontend-viteV2/src/services/topicService.js (แก้ตาม Console จริง)
 import axios from 'axios'
 
 const API_BASE = 'http://localhost:3000/api'
-
 const getToken = () => localStorage.getItem('token')
 
 const topicService = {
-  // Topics
   async getTopicsByPeriod(periodId) {
-    const response = await axios.get(`${API_BASE}/periods/${periodId}/topics`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
+    try {
+      const response = await axios.get(`${API_BASE}/topics/period/${periodId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      
+      console.log('Raw topics response:', response.data)
+      
+      // จาก Console: data: {topics: Array(2), weight_summary: {...}}
+      // ข้อมูลอยู่ใน response.data.data.topics
+      
+      let topics = []
+      
+      if (response.data?.data?.topics && Array.isArray(response.data.data.topics)) {
+        topics = response.data.data.topics
+        console.log('✅ Found topics in data.data.topics:', topics.length)
+      }
+      else if (response.data?.topics && Array.isArray(response.data.topics)) {
+        topics = response.data.topics
+        console.log('✅ Found topics in data.topics:', topics.length)
+      }
+      else if (response.data?.data && Array.isArray(response.data.data)) {
+        topics = response.data.data
+        console.log('✅ Found topics as data.data array:', topics.length)
+      }
+      else if (Array.isArray(response.data)) {
+        topics = response.data
+        console.log('✅ Found topics as direct array:', topics.length)
+      }
+      else {
+        console.warn('❌ No topics found. Available keys:', Object.keys(response.data || {}))
+        if (response.data?.data) {
+          console.warn('data keys:', Object.keys(response.data.data))
+        }
+        topics = []
+      }
+      
+      console.log('Final topics array:', topics)
+      return topics
+      
+    } catch (error) {
+      console.error('Get topics error:', error)
+      throw error
+    }
   },
 
   async createTopic(periodId, topicData) {
-    const response = await axios.post(`${API_BASE}/periods/${periodId}/topics`, topicData, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  async updateTopic(topicId, topicData) {
-    const response = await axios.put(`${API_BASE}/topics/${topicId}`, topicData, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  async deleteTopic(topicId) {
-    const response = await axios.delete(`${API_BASE}/topics/${topicId}`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  // Criteria
-  async getCriteriaByTopic(topicId) {
-    const response = await axios.get(`${API_BASE}/topics/${topicId}/criteria`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
+    try {
+      const response = await axios.post(`${API_BASE}/topics/period/${periodId}`, topicData, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Create topic error:', error)
+      throw error
+    }
   },
 
   async createCriteria(topicId, criteriaData) {
-    const response = await axios.post(`${API_BASE}/topics/${topicId}/criteria`, criteriaData, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
+    try {
+      const response = await axios.post(`${API_BASE}/topics/${topicId}/criteria`, criteriaData, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Create criteria error:', error)
+      throw error
+    }
   },
 
-  async updateCriteria(criteriaId, criteriaData) {
-    const response = await axios.put(`${API_BASE}/criteria/${criteriaId}`, criteriaData, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
+  async deleteTopic(topicId) {
+    try {
+      const response = await axios.delete(`${API_BASE}/topics/${topicId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      return response.data
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new Error('ฟีเจอร์ลบหัวข้อยังไม่พร้อม')
+      }
+      throw error
+    }
   },
 
   async deleteCriteria(criteriaId) {
-    const response = await axios.delete(`${API_BASE}/criteria/${criteriaId}`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  // Options
-  async getOptionsByCriteria(criteriaId) {
-    const response = await axios.get(`${API_BASE}/criteria/${criteriaId}/options`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  async createOption(criteriaId, optionData) {
-    const response = await axios.post(`${API_BASE}/criteria/${criteriaId}/options`, optionData, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  async updateOption(optionId, optionData) {
-    const response = await axios.put(`${API_BASE}/options/${optionId}`, optionData, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
-  },
-
-  async deleteOption(optionId) {
-    const response = await axios.delete(`${API_BASE}/options/${optionId}`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-    return response.data
+    try {
+      const response = await axios.delete(`${API_BASE}/criteria/${criteriaId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      return response.data
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new Error('ฟีเจอร์ลบตัวชี้วัดยังไม่พร้อม')
+      }
+      throw error
+    }
   }
 }
 

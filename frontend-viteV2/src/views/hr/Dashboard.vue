@@ -65,9 +65,9 @@
 
             <v-col cols="6" md="3">
               <v-card color="purple-lighten-4" class="text-center pa-4">
-                <v-icon size="40" color="purple">mdi-chart-line</v-icon>
-                <h2 class="mt-2">{{ stats.totalEvaluations }}</h2>
-                <p>การประเมินทั้งหมด</p>
+                <v-icon size="40" color="purple">mdi-format-list-bulleted</v-icon>
+                <h2 class="mt-2">{{ stats.totalTopics }}</h2>
+                <p>หัวข้อประเมิน</p>
               </v-card>
             </v-col>
           </v-row>
@@ -107,30 +107,6 @@
               </v-row>
             </v-card-text>
           </v-card>
-
-          <!-- Recent Activity -->
-          <v-card>
-            <v-card-title>
-              <v-icon class="mr-2">mdi-clock</v-icon>
-              กิจกรรมล่าสุด
-            </v-card-title>
-            <v-card-text>
-              <p v-if="!recentActivity.length" class="text-grey">ยังไม่มีกิจกรรมล่าสุด</p>
-              <v-timeline v-else density="compact">
-                <v-timeline-item
-                  v-for="activity in recentActivity"
-                  :key="activity.id"
-                  dot-color="primary"
-                  size="small"
-                >
-                  <div class="d-flex">
-                    <strong class="me-4">{{ activity.time }}</strong>
-                    <div>{{ activity.message }}</div>
-                  </div>
-                </v-timeline-item>
-              </v-timeline>
-            </v-card-text>
-          </v-card>
         </div>
 
         <!-- Period Management -->
@@ -164,26 +140,6 @@
               <v-alert type="info">
                 <strong>กำลังพัฒนา:</strong> หน้ารายงานจะพร้อมใช้งานเร็วๆ นี้
               </v-alert>
-              
-              <!-- Placeholder for reports -->
-              <v-row class="mt-4">
-                <v-col cols="12" md="6">
-                  <v-card outlined>
-                    <v-card-title>รายงานสถิติการประเมิน</v-card-title>
-                    <v-card-text>
-                      <p>แสดงสถิติการประเมินรายรอบ</p>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-card outlined>
-                    <v-card-title>รายงานผู้ใช้</v-card-title>
-                    <v-card-text>
-                      <p>แสดงข้อมูลผู้ใช้และสถานะ</p>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-              </v-row>
             </v-card-text>
           </v-card>
         </div>
@@ -216,9 +172,8 @@ export default {
         totalPeriods: 0,
         totalUsers: 0,
         activePeriods: 0,
-        totalEvaluations: 0
+        totalTopics: 0
       },
-      recentActivity: [],
       menuItems: [
         { title: 'ภาพรวม', value: 'dashboard', icon: 'mdi-view-dashboard' },
         { title: 'จัดการรอบประเมิน', value: 'periods', icon: 'mdi-calendar' },
@@ -250,18 +205,11 @@ export default {
         
         // Load users data
         const usersResponse = await userService.getUsers()
-        const users = usersResponse.data || []
+        const users = usersResponse.data?.users || usersResponse.data || []
         this.stats.totalUsers = users.length
         
-        // TODO: Load evaluations stats when API is ready
-        this.stats.totalEvaluations = 0
-        
-        // Mock recent activity for demo
-        this.recentActivity = [
-          { id: 1, time: '10:30', message: 'สร้างรอบการประเมินใหม่: "ประเมินไตรมาส Q1"' },
-          { id: 2, time: '09:15', message: 'เพิ่มผู้ใช้ใหม่: นายสมชาย ใจดี' },
-          { id: 3, time: '08:45', message: 'มอบหมายกรรมการประเมินเพิ่มเติม' }
-        ]
+        // TODO: Load topics stats when API is ready
+        this.stats.totalTopics = 0
         
       } catch (error) {
         console.error('Error loading dashboard stats:', error)
