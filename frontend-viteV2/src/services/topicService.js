@@ -1,4 +1,4 @@
-// frontend-viteV2/src/services/topicService.js (COMPLETE FIXED FILE)
+// frontend-viteV2/src/services/topicService.js 
 import axios from 'axios'
 
 const API_BASE = 'http://localhost:3000/api'
