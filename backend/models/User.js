@@ -89,12 +89,12 @@ class User {
 
   // อัปเดตข้อมูลผู้ใช้
   static async update(id, userData) {
-    const { full_name, email, department, position = null,role,is_active } = userData;
+    const {username, full_name, email, department, position = null,role,is_active } = userData;
     
     try {
       const [result] = await db.execute(
-        'UPDATE users SET full_name = ?, email = ?, department = ?, position = ? , role = ?, is_active = ? WHERE id = ?',
-        [full_name, email, department, position,role,is_active, id]
+        'UPDATE users SET username = ? ,full_name = ?, email = ?, department = ?, position = ? , role = ?, is_active = ? WHERE id = ?',
+        [username ,full_name, email, department, position,role,is_active, id]
       );
       
       return result.affectedRows > 0;

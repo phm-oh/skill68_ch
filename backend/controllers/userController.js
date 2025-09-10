@@ -44,7 +44,7 @@ const getUserById = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { full_name, email, department, position, role, is_active } = req.body;
+    const { username,full_name, email, department, position=null, role, is_active } = req.body;
 
     // ตรวจสอบว่าผู้ใช้มีอยู่หรือไม่
     const existingUser = await User.findById(id);
@@ -59,6 +59,7 @@ const updateUser = async (req, res) => {
 
     // เตรียมข้อมูลสำหรับอัปเดต
     const updateData = {
+      username,
       full_name,
       email,
       department,

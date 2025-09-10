@@ -51,7 +51,7 @@ const login = async (req, res) => {
 // ลงทะเบียน (สำหรับ HR สร้างผู้ใช้ใหม่)
 const register = async (req, res) => {
   try {
-    const { username, password, role, full_name, email, department, position } = req.body;
+    const { username, password, role, full_name, email, department, position = null } = req.body;
 
     // ตรวจสอบว่า username หรือ email มีอยู่แล้วหรือไม่
     const existingUser = await User.findByUsername(username);

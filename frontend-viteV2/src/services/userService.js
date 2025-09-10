@@ -105,6 +105,7 @@ const userService = {
       // รวมทุก field ที่ backend รองรับ
       const updatePayload = {}
         ;[
+          'username',
           'full_name',
           'email',
           'department',
