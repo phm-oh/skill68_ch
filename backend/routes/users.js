@@ -39,8 +39,8 @@ const validateUserUpdate = [
 // Validation สำหรับการเปลี่ยนสถานะ
 const validateStatusUpdate = [
   body('is_active')
-    .isBoolean()
-    .withMessage('สถานะต้องเป็น true หรือ false'),
+    .isInt({ min: 0, max: 1 })
+    .withMessage('is_active ต้องเป็น 0 หรือ 1'),
   
   handleValidationErrors
 ];
@@ -140,6 +140,7 @@ router.delete('/:id',
   requireRole('hr'), 
   userController.deleteUser
 );
+router.put('/:id/complete', authenticateToken, userController.updateUserComplete);
 
 // Route สำหรับทดสอบ
 router.get('/test/info', (req, res) => {

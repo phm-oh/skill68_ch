@@ -2,7 +2,6 @@
 import axios from 'axios'
 
 const API_BASE = 'http://localhost:3000/api'
-
 const getToken = () => localStorage.getItem('token')
 
 const userService = {
@@ -26,7 +25,7 @@ const userService = {
       const params = new URLSearchParams()
       if (query) params.append('q', query)
       if (role) params.append('role', role)
-      
+
       const response = await axios.get(`${API_BASE}/users/search?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` }
       })
@@ -50,70 +49,116 @@ const userService = {
     }
   },
 
-  // 🔥 Update user - ตรงกับ Backend userController.js
+  // Update user (fields + is_active)
+  // async updateUser(userId, userData) {
+  //   try {
+  //     console.log('🔄 Updating user:', { userId, userData })
+
+  //     // Build payload for fields the backend accepts
+  //     const updatePayload = {}
+
+  //     if (userData.full_name !== undefined) {
+  //       updatePayload.full_name = userData.full_name
+  //     }
+  //     if (userData.email !== undefined) {
+  //       updatePayload.email = userData.email
+  //     }
+  //     if (userData.department !== undefined) {
+  //       updatePayload.department = userData.department
+  //     }
+  //     if (userData.position !== undefined) {
+  //       updatePayload.position = userData.position
+  //     }
+
+  //     console.log('📦 Update payload (only backend fields):', updatePayload)
+
+  //     // Send main update
+  //     const response = await axios.put(
+  //       `${API_BASE}/users/${userId}`,
+  //       updatePayload,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${getToken()}`,
+  //           'Content-Type': 'application/json'
+  //         }
+  //       }
+  //     )
+
+  //     console.log('✅ Update user response:', response.data)
+
+  //     // If is_active was provided, update status via PATCH
+  //     if (userData.is_active !== undefined) {
+  //       console.log('🔄 Updating user status separately...')
+  //       await this.updateUserStatus(userId, userData.is_active)
+  //     }
+
+  //     return response.data
+  //   } catch (error) {
+  //     console.error('🔴 Update user error:', error)
+  //     throw new Error(error.response?.data?.message || 'ไม่สามารถแก้ไขข้อมูลผู้ใช้ได้')
+  //   }
+  // },
   async updateUser(userId, userData) {
     try {
       console.log('🔄 Updating user:', { userId, userData })
 
-      // 🎯 ส่งเฉพาะฟิลด์ที่ Backend รองรับ (ตาม userController.js)
+      // รวมทุก field ที่ backend รองรับ
       const updatePayload = {}
-      
-      if (userData.full_name !== undefined) {
-        updatePayload.full_name = userData.full_name
-      }
-      if (userData.email !== undefined) {
-        updatePayload.email = userData.email
-      }
-      if (userData.department !== undefined) {
-        updatePayload.department = userData.department
-      }
-      if (userData.position !== undefined) {
-        updatePayload.position = userData.position
-      }
+        ;[
+          'full_name',
+          'email',
+          'department',
+          'position',
+          'role',
+          'is_active'
+        ].forEach(key => {
+          if (userData[key] !== undefined) {
+            updatePayload[key] = userData[key]
+          }
+        })
 
-      console.log('📦 Update payload (only backend fields):', updatePayload)
+      console.log('📦 Update payload:', updatePayload)
 
-      // ส่งข้อมูลที่ Backend รองรับ
-      const response = await axios.put(`${API_BASE}/users/${userId}`, updatePayload, {
-        headers: { 
-          Authorization: `Bearer ${getToken()}`,
-          'Content-Type': 'application/json'
+      // ส่งข้อมูลผ่าน PUT ครบทั้ง role และ is_active
+      const response = await axios.put(
+        `${API_BASE}/users/${userId}`,
+        updatePayload,
+        {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            'Content-Type': 'application/json'
+          }
         }
-      })
-      
+      )
+
       console.log('✅ Update user response:', response.data)
-
-      // 🔄 ถ้ามีการอัปเดต status แยกต่างหาก
-      if (userData.status !== undefined) {
-        console.log('🔄 Updating user status separately...')
-        await this.updateUserStatus(userId, userData.status)
-      }
-
       return response.data
 
     } catch (error) {
       console.error('🔴 Update user error:', error)
-      throw new Error(error.response?.data?.message || 'ไม่สามารถแก้ไขข้อมูลผู้ใช้ได้')
+      throw new Error(
+        error.response?.data?.message || 'ไม่สามารถแก้ไขข้อมูลผู้ใช้ได้'
+      )
     }
   },
 
-  // 🆕 Update user status - ใช้ PATCH endpoint ที่ Backend มี
-  async updateUserStatus(userId, status) {
-    try {
-      console.log('🔄 Updating user status:', { userId, status })
 
-      const response = await axios.patch(`${API_BASE}/users/${userId}/status`, {
-        status: status  // 'active' หรือ 'inactive'
-      }, {
-        headers: { 
-          Authorization: `Bearer ${getToken()}`,
-          'Content-Type': 'application/json'
+  // Update user status (is_active: 0 | 1)
+  async updateUserStatus(userId, is_active) {
+    try {
+      console.log('🔄 Updating user status:', { userId, is_active })
+      const response = await axios.patch(
+        `${API_BASE}/users/${userId}/status`,
+        { is_active },
+        {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            'Content-Type': 'application/json'
+          }
         }
-      })
-      
+      )
       console.log('✅ Update status response:', response.data)
       return response.data
-
     } catch (error) {
       console.error('🔴 Update status error:', error)
       throw new Error(error.response?.data?.message || 'ไม่สามารถเปลี่ยนสถานะผู้ใช้ได้')
@@ -161,9 +206,11 @@ const userService = {
 
   async createCommitteeAssignment(assignmentData) {
     try {
-      const response = await axios.post(`${API_BASE}/committee/assignments`, assignmentData, {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      })
+      const response = await axios.post(
+        `${API_BASE}/committee/assignments`,
+        assignmentData,
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      )
       return response.data
     } catch (error) {
       console.error('🔴 Create committee assignment error:', error)
@@ -173,9 +220,11 @@ const userService = {
 
   async createBulkAssignments(assignmentData) {
     try {
-      const response = await axios.post(`${API_BASE}/committee/assignments/bulk`, assignmentData, {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      })
+      const response = await axios.post(
+        `${API_BASE}/committee/assignments/bulk`,
+        assignmentData,
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      )
       return response.data
     } catch (error) {
       console.error('🔴 Create bulk assignments error:', error)
@@ -185,9 +234,10 @@ const userService = {
 
   async deleteCommitteeAssignment(assignmentId) {
     try {
-      const response = await axios.delete(`${API_BASE}/committee/assignments/${assignmentId}`, {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      })
+      const response = await axios.delete(
+        `${API_BASE}/committee/assignments/${assignmentId}`,
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      )
       return response.data
     } catch (error) {
       console.error('🔴 Delete committee assignment error:', error)
