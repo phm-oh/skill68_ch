@@ -1,4 +1,4 @@
-<!-- frontend-viteV2/src/components/hr/PeriodManagement.vue (DEBUG + FIXED) -->
+<!-- frontend-viteV2/src/components/hr/PeriodManagement.vue -->
 <template>
   <v-container>
     <!-- Header -->
@@ -85,21 +85,26 @@
             </td>
             <td>{{ formatDateTime(period.created_at) }}</td>
             <td>
-              <v-tooltip text="ฟีเจอร์แก้ไขยังไม่พร้อม">
-                <template v-slot:activator="{ props }">
-                  <v-btn icon size="small" v-bind="props" disabled class="mr-1">
-                    <v-icon>mdi-pencil</v-icon>
-                  </v-btn>
-                </template>
-              </v-tooltip>
+              <!-- แก้ไข -->
+              <v-btn 
+                icon 
+                size="small" 
+                @click="editPeriod(period)" 
+                class="mr-1"
+                color="orange"
+              >
+                <v-icon>mdi-pencil</v-icon>
+              </v-btn>
 
-              <v-tooltip text="ฟีเจอร์ลบยังไม่พร้อม">
-                <template v-slot:activator="{ props }">
-                  <v-btn icon size="small" color="red" v-bind="props" disabled>
-                    <v-icon>mdi-delete</v-icon>
-                  </v-btn>
-                </template>
-              </v-tooltip>
+              <!-- ลบ -->
+              <v-btn 
+                icon 
+                size="small" 
+                color="red" 
+                @click="deletePeriod(period)"
+              >
+                <v-icon>mdi-delete</v-icon>
+              </v-btn>
             </td>
           </tr>
           
@@ -119,7 +124,7 @@
     <v-dialog v-model="dialog" max-width="500px" persistent>
       <v-card>
         <v-card-title>
-          เพิ่มรอบการประเมินใหม่
+          {{ editingPeriod ? 'แก้ไขรอบการประเมิน' : 'เพิ่มรอบการประเมินใหม่' }}
         </v-card-title>
 
         <v-card-text>
@@ -130,17 +135,15 @@
             density="compact"
             placeholder="เช่น การประเมินไตรมาส 1/2568"
             :disabled="saving"
-            :error="!form.period_name.trim() && showValidation"
-            error-message="กรุณากรอกชื่อรอบการประเมิน"
           />
 
           <v-textarea
             v-model="form.description"
-            label="คำอธิบาย (ไม่จำเป็น)"
+            label="คำอธิบาย"
             variant="outlined"
-            rows="2"
             density="compact"
-            placeholder="อธิบายรายละเอียดของรอบการประเมิน"
+            rows="2"
+            placeholder="รายละเอียดของรอบการประเมิน (ไม่บังคับ)"
             :disabled="saving"
           />
 
@@ -153,8 +156,6 @@
                 variant="outlined"
                 density="compact"
                 :disabled="saving"
-                :error="!form.start_date && showValidation"
-                error-message="กรุณาเลือกวันเริ่มต้น"
               />
             </v-col>
             <v-col cols="6">
@@ -165,8 +166,6 @@
                 variant="outlined"
                 density="compact"
                 :disabled="saving"
-                :error="!form.end_date && showValidation"
-                error-message="กรุณาเลือกวันสิ้นสุด"
               />
             </v-col>
           </v-row>
@@ -177,21 +176,38 @@
             color="primary"
             :disabled="saving"
           />
-
-          <!-- Form Debug -->
-          <v-card v-if="showDebug" class="mt-3" color="grey-lighten-4">
-            <v-card-text>
-              <strong>Form Data:</strong>
-              <pre>{{ JSON.stringify(form, null, 2) }}</pre>
-            </v-card-text>
-          </v-card>
         </v-card-text>
 
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="closeDialog" :disabled="saving">ยกเลิก</v-btn>
+          <v-btn @click="closeDialog" :disabled="saving">
+            ยกเลิก
+          </v-btn>
           <v-btn color="primary" @click="savePeriod" :loading="saving">
-            สร้างรอบการประเมิน
+            {{ editingPeriod ? 'บันทึกการแก้ไข' : 'สร้างรอบการประเมิน' }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <v-dialog v-model="deleteDialog" max-width="400px">
+      <v-card>
+        <v-card-title class="text-h5">ยืนยันการลบ</v-card-title>
+        <v-card-text>
+          คุณต้องการลบรอบการประเมิน <strong>"{{ deletingPeriod?.period_name }}"</strong> หรือไม่?
+          <br><br>
+          <v-alert type="warning" density="compact">
+            การลบจะไม่สามารถย้อนกลับได้!
+          </v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="deleteDialog = false" :disabled="deleting">
+            ยกเลิก
+          </v-btn>
+          <v-btn color="red" @click="confirmDelete" :loading="deleting">
+            ลบ
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -209,11 +225,14 @@ export default {
       periods: [],
       loading: false,
       saving: false,
+      deleting: false,
       error: null,
       successMessage: null,
       dialog: false,
+      deleteDialog: false,
       showDebug: false,
-      showValidation: false,
+      editingPeriod: null,
+      deletingPeriod: null,
       form: {
         period_name: '',
         description: '',
@@ -257,21 +276,8 @@ export default {
       }
     },
 
-    async testAPI() {
-      this.error = null
-      try {
-        console.log('Testing API connection...')
-        const response = await periodService.testConnection()
-        console.log('API Test successful:', response)
-        alert('API เชื่อมต่อได้! เช็ค Console ดู response')
-      } catch (error) {
-        console.error('API Test failed:', error)
-        this.error = 'API Test ล้มเหลว: ' + error.message
-        alert('API Test ล้มเหลว! เช็ค Console')
-      }
-    },
-
     openDialog() {
+      this.editingPeriod = null
       this.form = {
         period_name: '',
         description: '',
@@ -279,18 +285,28 @@ export default {
         end_date: '',
         is_active: true
       }
-      this.showValidation = false
+      this.dialog = true
+    },
+
+    editPeriod(period) {
+      this.editingPeriod = period
+      this.form = {
+        period_name: period.period_name,
+        description: period.description || '',
+        start_date: period.start_date,
+        end_date: period.end_date,
+        is_active: period.is_active
+      }
       this.dialog = true
     },
 
     closeDialog() {
       this.dialog = false
-      this.showValidation = false
+      this.editingPeriod = null
     },
 
+    // Simple validation
     validateForm() {
-      this.showValidation = true
-      
       if (!this.form.period_name.trim()) {
         this.error = 'กรุณากรอกชื่อรอบการประเมิน'
         return false
@@ -323,20 +339,53 @@ export default {
       try {
         console.log('Form data to send:', this.form)
         
-        const response = await periodService.createPeriod(this.form)
-        console.log('Create response:', response)
+        let response
+        if (this.editingPeriod) {
+          // Update existing period
+          response = await periodService.updatePeriod(this.editingPeriod.id, this.form)
+          this.successMessage = 'แก้ไขรอบการประเมินสำเร็จ!'
+        } else {
+          // Create new period
+          response = await periodService.createPeriod(this.form)
+          this.successMessage = 'สร้างรอบการประเมินสำเร็จ!'
+        }
+        
+        console.log('Save response:', response)
         
         this.dialog = false
-        this.successMessage = 'สร้างรอบการประเมินสำเร็จ!'
         
         // โหลดข้อมูลใหม่
         await this.loadPeriods()
         
       } catch (error) {
         console.error('Error saving period:', error)
-        this.error = error.message || 'ไม่สามารถสร้างรอบการประเมินได้'
+        this.error = error.message || 'ไม่สามารถบันทึกรอบการประเมินได้'
       } finally {
         this.saving = false
+      }
+    },
+
+    deletePeriod(period) {
+      this.deletingPeriod = period
+      this.deleteDialog = true
+    },
+
+    async confirmDelete() {
+      if (!this.deletingPeriod) return
+
+      this.deleting = true
+      this.error = null
+
+      try {
+        await periodService.deletePeriod(this.deletingPeriod.id)
+        this.successMessage = `ลบรอบการประเมิน "${this.deletingPeriod.period_name}" สำเร็จ`
+        this.deleteDialog = false
+        await this.loadPeriods()
+      } catch (error) {
+        console.error('Error deleting period:', error)
+        this.error = error.message || 'ไม่สามารถลบรอบการประเมินได้'
+      } finally {
+        this.deleting = false
       }
     },
 

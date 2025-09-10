@@ -1,42 +1,43 @@
-<!-- frontend-viteV2/src/components/hr/UserManagement.vue (CLEAN VERSION) -->
+<!-- frontend-viteV2/src/components/hr/UserManagement.vue -->
 <template>
   <v-container>
     <!-- Header -->
     <div class="d-flex justify-space-between align-center mb-4">
-      <h2>จัดการผู้ใช้</h2>
+      <h2>จัดการผู้ใช้งาน</h2>
       <v-btn color="primary" @click="openUserDialog()">
-        <v-icon left>mdi-account-plus</v-icon>
+        <v-icon left>mdi-plus</v-icon>
         เพิ่มผู้ใช้
       </v-btn>
     </div>
 
-    <!-- Quick Filters -->
+    <!-- Filters -->
     <v-row class="mb-4">
-      <v-col cols="6">
+      <v-col cols="12" md="4">
         <v-text-field
           v-model="searchQuery"
-          label="ค้นหา"
-          variant="outlined"
+          label="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
+          variant="outlined"
           density="compact"
           clearable
           @input="filterUsers"
         />
       </v-col>
-      <v-col cols="4">
+      <v-col cols="12" md="3">
         <v-select
           v-model="roleFilter"
           :items="roleOptions"
-          label="บทบาท"
+          label="กรองตามบทบาท"
           variant="outlined"
           density="compact"
           clearable
           @update:modelValue="filterUsers"
         />
       </v-col>
-      <v-col cols="2">
+      <v-col cols="12" md="2">
         <v-btn @click="loadUsers" :loading="loading" block>
-          <v-icon>mdi-refresh</v-icon>
+          <v-icon left>mdi-refresh</v-icon>
+          โหลดใหม่
         </v-btn>
       </v-col>
     </v-row>
@@ -46,23 +47,34 @@
       {{ error }}
     </v-alert>
 
+    <!-- Success Alert -->
+    <v-alert v-if="successMessage" type="success" class="mb-4" closable @click:close="successMessage = null">
+      {{ successMessage }}
+    </v-alert>
+
     <!-- Users Table -->
     <v-card>
+      <v-card-title>
+        รายการผู้ใช้งาน ({{ displayUsers.length }} คน)
+      </v-card-title>
+
       <v-table>
         <thead>
           <tr>
             <th>ชื่อผู้ใช้</th>
-            <th>ชื่อ-สกุล</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>อีเมล</th>
             <th>บทบาท</th>
             <th>แผนก</th>
             <th>สถานะ</th>
-            <th width="100">จัดการ</th>
+            <th width="150">จัดการ</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="user in displayUsers" :key="user.id">
             <td><strong>{{ user.username }}</strong></td>
             <td>{{ user.full_name }}</td>
+            <td>{{ user.email }}</td>
             <td>
               <v-chip :color="getRoleColor(user.role)" size="small">
                 {{ getRoleLabel(user.role) }}
@@ -84,7 +96,7 @@
             </td>
           </tr>
           <tr v-if="displayUsers.length === 0">
-            <td colspan="6" class="text-center py-4">
+            <td colspan="7" class="text-center py-4">
               {{ loading ? 'กำลังโหลด...' : 'ไม่พบข้อมูล' }}
             </td>
           </tr>
@@ -98,7 +110,7 @@
     </v-card>
 
     <!-- User Dialog -->
-    <v-dialog v-model="userDialog" max-width="500px">
+    <v-dialog v-model="userDialog" max-width="500px" persistent>
       <v-card>
         <v-card-title>
           {{ editingId ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่' }}
@@ -107,32 +119,36 @@
         <v-card-text>
           <v-text-field
             v-model="form.username"
-            label="ชื่อผู้ใช้"
+            label="ชื่อผู้ใช้ *"
             variant="outlined"
             density="compact"
+            :disabled="!!editingId || saving"
           />
 
           <v-text-field
             v-model="form.full_name"
-            label="ชื่อ-นามสกุล"
+            label="ชื่อ-นามสกุล *"
             variant="outlined"
             density="compact"
+            :disabled="saving"
           />
 
           <v-text-field
             v-model="form.email"
-            label="อีเมล"
+            label="อีเมล *"
             type="email"
             variant="outlined"
             density="compact"
+            :disabled="saving"
           />
 
           <v-select
             v-model="form.role"
             :items="roleOptions"
-            label="บทบาท"
+            label="บทบาท *"
             variant="outlined"
             density="compact"
+            :disabled="saving"
           />
 
           <v-text-field
@@ -140,15 +156,17 @@
             label="แผนก"
             variant="outlined"
             density="compact"
+            :disabled="saving"
           />
 
           <v-text-field
             v-if="!editingId"
             v-model="form.password"
-            label="รหัสผ่าน"
+            label="รหัสผ่าน *"
             type="password"
             variant="outlined"
             density="compact"
+            :disabled="saving"
           />
 
           <v-select
@@ -157,14 +175,15 @@
             label="สถานะ"
             variant="outlined"
             density="compact"
+            :disabled="saving"
           />
         </v-card-text>
 
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="userDialog = false">ยกเลิก</v-btn>
+          <v-btn @click="userDialog = false" :disabled="saving">ยกเลิก</v-btn>
           <v-btn color="primary" @click="saveUser" :loading="saving">
-            บันทึก
+            {{ editingId ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ใช้' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -184,12 +203,12 @@ export default {
       loading: false,
       saving: false,
       error: null,
-      searchQuery: '',
-      roleFilter: '',
-      
-      // Dialog
+      successMessage: null,
       userDialog: false,
       editingId: null,
+      searchQuery: '',
+      roleFilter: null,
+      
       form: {
         username: '',
         full_name: '',
@@ -199,13 +218,13 @@ export default {
         password: '',
         status: 'active'
       },
-
-      // Options
+      
       roleOptions: [
-        { title: 'ผู้รับการประเมิน', value: 'evaluatee' },
-        { title: 'กรรมการประเมิน', value: 'committee' },
-        { title: 'ฝ่ายบุคคล', value: 'hr' }
+        { title: 'ฝ่าย HR', value: 'hr' },
+        { title: 'กรรมการ', value: 'committee' },
+        { title: 'ผู้รับประเมิน', value: 'evaluatee' }
       ],
+      
       statusOptions: [
         { title: 'ใช้งาน', value: 'active' },
         { title: 'ปิดใช้งาน', value: 'inactive' }
@@ -221,21 +240,24 @@ export default {
     async loadUsers() {
       this.loading = true
       this.error = null
+      
       try {
         const response = await userService.getUsers()
-        // Handle different response structures
-        if (response.data && response.data.users) {
-          this.users = response.data.users
-        } else if (response.data && Array.isArray(response.data)) {
-          this.users = response.data
+        
+        if (response && response.success) {
+          this.users = response.data?.users || response.data || []
         } else {
           this.users = []
+          this.error = response?.message || 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้'
         }
+        
         this.filterUsers()
+        
       } catch (error) {
         console.error('Error loading users:', error)
-        this.error = 'ไม่สามารถโหลดข้อมูลได้'
+        this.error = 'เกิดข้อผิดพลาดในการโหลดข้อมูล: ' + error.message
         this.users = []
+        this.displayUsers = []
       } finally {
         this.loading = false
       }
@@ -249,7 +271,8 @@ export default {
         const query = this.searchQuery.toLowerCase()
         filtered = filtered.filter(user => 
           user.username?.toLowerCase().includes(query) ||
-          user.full_name?.toLowerCase().includes(query)
+          user.full_name?.toLowerCase().includes(query) ||
+          user.email?.toLowerCase().includes(query)
         )
       }
       
@@ -275,21 +298,70 @@ export default {
       this.userDialog = true
     },
 
+    // Simple validation
+    validateForm() {
+      if (!this.form.username.trim()) {
+        this.error = 'กรุณากรอกชื่อผู้ใช้'
+        return false
+      }
+
+      if (!this.form.full_name.trim()) {
+        this.error = 'กรุณากรอกชื่อ-นามสกุล'
+        return false
+      }
+
+      if (!this.form.email.trim()) {
+        this.error = 'กรุณากรอกอีเมล'
+        return false
+      }
+
+      // Basic email validation
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailPattern.test(this.form.email)) {
+        this.error = 'รูปแบบอีเมลไม่ถูกต้อง'
+        return false
+      }
+
+      if (!this.editingId && !this.form.password.trim()) {
+        this.error = 'กรุณากรอกรหัสผ่าน'
+        return false
+      }
+
+      if (!this.editingId && this.form.password.length < 6) {
+        this.error = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'
+        return false
+      }
+
+      return true
+    },
+
     async saveUser() {
+      if (!this.validateForm()) {
+        return
+      }
+
       this.saving = true
       this.error = null
+      this.successMessage = null
+      
       try {
         if (this.editingId) {
+          // Update - ไม่ส่ง password
           const { password, ...updateData } = this.form
           await userService.updateUser(this.editingId, updateData)
+          this.successMessage = 'แก้ไขข้อมูลผู้ใช้สำเร็จ!'
         } else {
+          // Create - ส่ง password ด้วย
           await userService.createUser(this.form)
+          this.successMessage = 'เพิ่มผู้ใช้ใหม่สำเร็จ!'
         }
+        
         this.userDialog = false
         await this.loadUsers()
+        
       } catch (error) {
         console.error('Error saving user:', error)
-        this.error = 'ไม่สามารถบันทึกข้อมูลได้'
+        this.error = error.message || 'ไม่สามารถบันทึกข้อมูลได้'
       } finally {
         this.saving = false
       }
@@ -298,12 +370,15 @@ export default {
     async deleteUser(userId) {
       if (!confirm('คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?')) return
       
+      this.error = null
+      
       try {
         await userService.deleteUser(userId)
+        this.successMessage = 'ลบผู้ใช้สำเร็จ!'
         await this.loadUsers()
       } catch (error) {
         console.error('Error deleting user:', error)
-        this.error = 'ไม่สามารถลบผู้ใช้ได้'
+        this.error = error.message || 'ไม่สามารถลบผู้ใช้ได้'
       }
     },
 
@@ -317,3 +392,13 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.v-table {
+  font-size: 14px;
+}
+
+.v-chip {
+  font-weight: 500;
+}
+</style>

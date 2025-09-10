@@ -1,4 +1,4 @@
-// src/services/api.js
+// frontend-viteV2/src/services/api.js
 import axios from 'axios'
 
 const API_BASE_URL = 'http://localhost:3000/api'
