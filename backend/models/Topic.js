@@ -5,61 +5,61 @@ const db = require('../config/database');
 
 class Topic {
   // ดึงหัวข้อทั้งหมดในรอบการประเมิน
- // แก้ไขใน backend/models/Topic.js - วิธีง่าย
+  // แก้ไขใน backend/models/Topic.js - วิธีง่าย
 
-// เปลี่ยน method getByPeriodId ให้ดึง criteria มาด้วย (วิธีง่าย)
-static async getByPeriodId(periodId) {
-  try {
-    console.log('🔍 Getting topics with criteria for period:', periodId);
-    
-    // 1. ดึง topics ก่อน
-    const [topicRows] = await db.execute(`
+  // เปลี่ยน method getByPeriodId ให้ดึง criteria มาด้วย (วิธีง่าย)
+  static async getByPeriodId(periodId) {
+    try {
+      console.log('🔍 Getting topics with criteria for period:', periodId);
+
+      // 1. ดึง topics ก่อน
+      const [topicRows] = await db.execute(`
       SELECT * FROM evaluation_topics 
       WHERE period_id = ? 
       ORDER BY sort_order ASC, id ASC
     `, [periodId]);
-    
-    console.log('📋 Found topics:', topicRows.length);
-    
-    // 2. ดึง criteria สำหรับแต่ละ topic แยกกัน
-    for (let topic of topicRows) {
-      console.log(`🔍 Getting criteria for topic ${topic.id}: "${topic.topic_name}"`);
-      
-      // ดึง criteria
-      const [criteriaRows] = await db.execute(`
+
+      console.log('📋 Found topics:', topicRows.length);
+
+      // 2. ดึง criteria สำหรับแต่ละ topic แยกกัน
+      for (let topic of topicRows) {
+        console.log(`🔍 Getting criteria for topic ${topic.id}: "${topic.topic_name}"`);
+
+        // ดึง criteria
+        const [criteriaRows] = await db.execute(`
         SELECT * FROM evaluation_criteria 
         WHERE topic_id = ? 
         ORDER BY sort_order ASC, id ASC
       `, [topic.id]);
-      
-      // ดึง options สำหรับแต่ละ criteria
-      for (let criteria of criteriaRows) {
-        const [optionRows] = await db.execute(`
+
+        // ดึง options สำหรับแต่ละ criteria
+        for (let criteria of criteriaRows) {
+          const [optionRows] = await db.execute(`
           SELECT * FROM evaluation_options 
           WHERE criteria_id = ? 
           ORDER BY sort_order ASC, option_value ASC
         `, [criteria.id]);
-        
-        criteria.options = optionRows;
+
+          criteria.options = optionRows;
+        }
+
+        topic.criteria = criteriaRows;
+        console.log(`✅ Topic "${topic.topic_name}": ${criteriaRows.length} criteria`);
+
+        // Debug: แสดงรายละเอียด criteria
+        criteriaRows.forEach((criteria, index) => {
+          console.log(`   ${index + 1}. ${criteria.criteria_name} (${criteria.options.length} options)`);
+        });
       }
-      
-      topic.criteria = criteriaRows;
-      console.log(`✅ Topic "${topic.topic_name}": ${criteriaRows.length} criteria`);
-      
-      // Debug: แสดงรายละเอียด criteria
-      criteriaRows.forEach((criteria, index) => {
-        console.log(`   ${index + 1}. ${criteria.criteria_name} (${criteria.options.length} options)`);
-      });
+
+      console.log('✅ All topics with criteria loaded successfully');
+      return topicRows;
+
+    } catch (error) {
+      console.error('❌ Error in getByPeriodId:', error);
+      throw new Error('เกิดข้อผิดพลาดในการดึงหัวข้อการประเมิน: ' + error.message);
     }
-    
-    console.log('✅ All topics with criteria loaded successfully');
-    return topicRows;
-    
-  } catch (error) {
-    console.error('❌ Error in getByPeriodId:', error);
-    throw new Error('เกิดข้อผิดพลาดในการดึงหัวข้อการประเมิน: ' + error.message);
   }
-}
 
   // ดึงหัวข้อตาม ID พร้อมตัวชี้วัด
   static async findById(id) {
@@ -68,18 +68,18 @@ static async getByPeriodId(periodId) {
         'SELECT * FROM evaluation_topics WHERE id = ?',
         [id]
       );
-      
+
       if (topicRows.length === 0) return null;
-      
+
       const topic = topicRows[0];
-      
+
       // ดึงตัวชี้วัดในหัวข้อนี้
       const [criteriaRows] = await db.execute(`
         SELECT * FROM evaluation_criteria 
         WHERE topic_id = ? 
         ORDER BY sort_order ASC, id ASC
       `, [id]);
-      
+
       topic.criteria = criteriaRows;
       return topic;
     } catch (error) {
@@ -90,7 +90,7 @@ static async getByPeriodId(periodId) {
   // สร้างหัวข้อใหม่
   static async create(topicData) {
     const { period_id, topic_name, weight_percentage, sort_order } = topicData;
-    
+
     try {
       // ตรวจสอบว่าน้ำหนักรวมไม่เกิน 100%
       const [weightCheck] = await db.execute(`
@@ -98,10 +98,10 @@ static async getByPeriodId(periodId) {
         FROM evaluation_topics 
         WHERE period_id = ?
       `, [period_id]);
-      
+
       const currentTotal = parseFloat(weightCheck[0].total_weight || 0);
       const newTotal = currentTotal + parseFloat(weight_percentage);
-      
+
       if (newTotal > 100) {
         throw new Error(`น้ำหนักรวมเกิน 100% (ปัจจุบัน ${currentTotal}% + ${weight_percentage}% = ${newTotal}%)`);
       }
@@ -110,7 +110,7 @@ static async getByPeriodId(periodId) {
         INSERT INTO evaluation_topics (period_id, topic_name, weight_percentage, sort_order, created_at) 
         VALUES (?, ?, ?, ?, NOW())
       `, [period_id, topic_name, weight_percentage, sort_order || 0]);
-      
+
       return {
         id: result.insertId,
         period_id,
@@ -126,7 +126,7 @@ static async getByPeriodId(periodId) {
   // อัปเดตหัวข้อ
   static async update(id, topicData) {
     const { topic_name, weight_percentage, sort_order } = topicData;
-    
+
     try {
       // ตรวจสอบน้ำหนักรวม (ยกเว้นตัวเอง)
       if (weight_percentage !== undefined) {
@@ -134,20 +134,20 @@ static async getByPeriodId(periodId) {
           'SELECT period_id, weight_percentage FROM evaluation_topics WHERE id = ?',
           [id]
         );
-        
+
         if (currentTopic.length === 0) {
           throw new Error('ไม่พบหัวข้อการประเมินที่ระบุ');
         }
-        
+
         const [weightCheck] = await db.execute(`
           SELECT SUM(weight_percentage) as total_weight 
           FROM evaluation_topics 
           WHERE period_id = ? AND id != ?
         `, [currentTopic[0].period_id, id]);
-        
+
         const otherTotal = parseFloat(weightCheck[0].total_weight || 0);
         const newTotal = otherTotal + parseFloat(weight_percentage);
-        
+
         if (newTotal > 100) {
           throw new Error(`น้ำหนักรวมเกิน 100% (หัวข้ออื่น ${otherTotal}% + ใหม่ ${weight_percentage}% = ${newTotal}%)`);
         }
@@ -158,7 +158,7 @@ static async getByPeriodId(periodId) {
         SET topic_name = ?, weight_percentage = ?, sort_order = ?
         WHERE id = ?
       `, [topic_name, weight_percentage, sort_order, id]);
-      
+
       return result.affectedRows > 0;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการอัปเดตหัวข้อการประเมิน: ' + error.message);
@@ -184,7 +184,7 @@ static async getByPeriodId(periodId) {
         'DELETE FROM evaluation_topics WHERE id = ?',
         [id]
       );
-      
+
       return result.affectedRows > 0;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการลบหัวข้อการประเมิน: ' + error.message);
@@ -201,7 +201,7 @@ static async getByPeriodId(periodId) {
         FROM evaluation_topics 
         WHERE period_id = ?
       `, [periodId]);
-      
+
       return {
         total_weight: parseFloat(rows[0].total_weight || 0),
         topic_count: parseInt(rows[0].topic_count || 0),
@@ -222,7 +222,7 @@ class Criteria {
         WHERE topic_id = ? 
         ORDER BY sort_order ASC, id ASC
       `, [topicId]);
-      
+
       // ดึงตัวเลือกสำหรับแต่ละตัวชี้วัด
       for (let criteria of rows) {
         const [options] = await db.execute(`
@@ -230,10 +230,10 @@ class Criteria {
           WHERE criteria_id = ? 
           ORDER BY sort_order ASC, option_value ASC
         `, [criteria.id]);
-        
+
         criteria.options = options;
       }
-      
+
       return rows;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการดึงตัวชี้วัด: ' + error.message);
@@ -247,18 +247,18 @@ class Criteria {
         'SELECT * FROM evaluation_criteria WHERE id = ?',
         [id]
       );
-      
+
       if (criteriaRows.length === 0) return null;
-      
+
       const criteria = criteriaRows[0];
-      
+
       // ดึงตัวเลือก
       const [optionRows] = await db.execute(`
         SELECT * FROM evaluation_options 
         WHERE criteria_id = ? 
         ORDER BY sort_order ASC, option_value ASC
       `, [id]);
-      
+
       criteria.options = optionRows;
       return criteria;
     } catch (error) {
@@ -268,17 +268,17 @@ class Criteria {
 
   // สร้างตัวชี้วัดใหม่
   static async create(criteriaData) {
-    const { 
-      topic_id, 
-      criteria_name, 
-      weight_score, 
-      evaluation_type, 
-      evidence_required, 
-      evidence_types, 
+    const {
+      topic_id,
+      criteria_name,
+      weight_score,
+      evaluation_type,
+      evidence_required,
+      evidence_types,
       sort_order,
-      options 
+      options
     } = criteriaData;
-    
+
     try {
       // สร้างตัวชี้วัด
       const [result] = await db.execute(`
@@ -286,20 +286,20 @@ class Criteria {
         (topic_id, criteria_name, weight_score, evaluation_type, evidence_required, evidence_types, sort_order, created_at) 
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
       `, [
-        topic_id, 
-        criteria_name, 
-        weight_score, 
-        evaluation_type || 'scale_1_4', 
-        evidence_required !== false, 
+        topic_id,
+        criteria_name,
+        weight_score,
+        evaluation_type || 'scale_1_4',
+        evidence_required !== false,
         evidence_types ? JSON.stringify(evidence_types) : null,
         sort_order || 0
       ]);
-      
+
       const criteriaId = result.insertId;
-      
+
       // สร้างตัวเลือกเริ่มต้น
       await this.createDefaultOptions(criteriaId, evaluation_type, options);
-      
+
       return {
         id: criteriaId,
         topic_id,
@@ -319,7 +319,7 @@ class Criteria {
   static async createDefaultOptions(criteriaId, evaluationType, customOptions = null) {
     try {
       let defaultOptions = [];
-      
+
       if (customOptions && Array.isArray(customOptions)) {
         defaultOptions = customOptions;
       } else {
@@ -342,7 +342,7 @@ class Criteria {
             return; // custom_options จะต้องส่งมาเอง
         }
       }
-      
+
       for (let option of defaultOptions) {
         await db.execute(`
           INSERT INTO evaluation_options (criteria_id, option_text, option_value, sort_order, created_at)
@@ -357,22 +357,22 @@ class Criteria {
   // อัปเดตตัวชี้วัด
   static async update(id, criteriaData) {
     const { criteria_name, weight_score, evaluation_type, evidence_required, evidence_types, sort_order } = criteriaData;
-    
+
     try {
       const [result] = await db.execute(`
         UPDATE evaluation_criteria 
         SET criteria_name = ?, weight_score = ?, evaluation_type = ?, evidence_required = ?, evidence_types = ?, sort_order = ?
         WHERE id = ?
       `, [
-        criteria_name, 
-        weight_score, 
-        evaluation_type, 
-        evidence_required, 
+        criteria_name,
+        weight_score,
+        evaluation_type,
+        evidence_required,
         evidence_types ? JSON.stringify(evidence_types) : null,
-        sort_order, 
+        sort_order,
         id
       ]);
-      
+
       return result.affectedRows > 0;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการอัปเดตตัวชี้วัด: ' + error.message);
@@ -396,7 +396,7 @@ class Criteria {
         'DELETE FROM evaluation_criteria WHERE id = ?',
         [id]
       );
-      
+
       return result.affectedRows > 0;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการลบตัวชี้วัด: ' + error.message);

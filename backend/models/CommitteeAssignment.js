@@ -219,6 +219,7 @@ class CommitteeAssignment {
     throw error;
   }
 }
+
 }
 
 module.exports = CommitteeAssignment;
