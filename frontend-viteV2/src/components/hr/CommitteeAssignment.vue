@@ -29,17 +29,70 @@
 
     <div v-if="selectedPeriod">
       <div class="d-flex justify-space-between align-center mb-4">
-        <h3>การมอบหมาย</h3>
-        <v-btn color="primary" @click="openAssignDialog()">
-          <v-icon left>mdi-plus</v-icon>
-          มอบหมายใหม่
-        </v-btn>
+        <h3>การมอบหมาย ({{ assignments.length }} รายการ)</h3>
+        <div>
+          <v-btn size="small" color="info" @click="debugData" class="mr-2">
+            🔍 Debug
+          </v-btn>
+          <v-btn size="small" color="warning" @click="showDebug = !showDebug" class="mr-2">
+            {{ showDebug ? 'ซ่อน' : 'แสดง' }} Debug
+          </v-btn>
+          <v-btn color="primary" @click="openAssignDialog()">
+            <v-icon left>mdi-plus</v-icon>
+            มอบหมายใหม่
+          </v-btn>
+        </div>
       </div>
 
+      <!-- Debug Panel -->
+      <v-card v-if="showDebug" class="mb-4" color="yellow-lighten-4">
+        <v-card-title>🔍 Debug Info</v-card-title>
+        <v-card-text>
+          <p><strong>Selected Period:</strong> {{ selectedPeriod }}</p>
+          <p><strong>Assignments Length:</strong> {{ assignments.length }}</p>
+          <p><strong>Committees Length:</strong> {{ committees.length }}</p>
+          <p><strong>Evaluatees Length:</strong> {{ evaluatees.length }}</p>
+          <p><strong>Loading:</strong> {{ loading }}</p>
+          <p><strong>Error:</strong> {{ error }}</p>
+          
+          <v-expansion-panels v-if="assignments.length > 0" class="mt-2">
+            <v-expansion-panel title="Raw Assignments Data">
+              <v-expansion-panel-text>
+                <pre style="font-size: 12px;">{{ JSON.stringify(assignments, null, 2) }}</pre>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+            <v-expansion-panel title="Committees Data">
+              <v-expansion-panel-text>
+                <pre style="font-size: 12px;">{{ JSON.stringify(committees, null, 2) }}</pre>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+            <v-expansion-panel title="Evaluatees Data">
+              <v-expansion-panel-text>
+                <pre style="font-size: 12px;">{{ JSON.stringify(evaluatees, null, 2) }}</pre>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
+          
+          <div class="mt-2">
+            <v-btn size="small" @click="loadAssignments" class="mr-2">
+              Force Reload
+            </v-btn>
+            <v-btn size="small" @click="showDebug = false">
+              ซ่อน Debug
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <!-- Assignments Table -->
       <v-card v-if="assignments.length > 0">
+        <v-card-title>
+          รายการการมอบหมายกรรมการ ({{ assignments.length }} รายการ)
+        </v-card-title>
         <v-table>
           <thead>
             <tr>
+              <th>ID</th>
               <th>กรรมการ</th>
               <th>ผู้รับการประเมิน</th>
               <th>บทบาท</th>
@@ -49,8 +102,9 @@
           </thead>
           <tbody>
             <tr v-for="assignment in assignments" :key="assignment.id">
-              <td>{{ assignment.committee_name }}</td>
-              <td>{{ assignment.evaluatee_name }}</td>
+              <td><strong>#{{ assignment.id }}</strong></td>
+              <td>{{ assignment.committee_name || 'ไม่ระบุ' }}</td>
+              <td>{{ assignment.evaluatee_name || 'ไม่ระบุ' }}</td>
               <td>
                 <v-chip :color="assignment.role === 'chairman' ? 'red' : 'blue'" size="small">
                   {{ assignment.role === 'chairman' ? 'ประธาน' : 'กรรมการ' }}
@@ -67,9 +121,20 @@
         </v-table>
       </v-card>
 
+      <!-- Empty State -->
       <div v-else-if="!loading" class="text-center py-8">
         <v-icon size="48" color="grey">mdi-account-group</v-icon>
         <p class="mt-2">ยังไม่มีการมอบหมายกรรมการ</p>
+        <p class="text-caption">หรือ API ไม่ได้ส่งข้อมูลที่ถูกต้อง</p>
+        <v-btn size="small" color="info" @click="showDebug = true" class="mt-2">
+          ดู Debug
+        </v-btn>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="text-center py-8">
+        <v-progress-circular indeterminate color="primary" />
+        <p class="mt-2">กำลังโหลดข้อมูล...</p>
       </div>
     </div>
 
@@ -138,6 +203,7 @@ export default {
       error: null,
       successMessage: null,
       assignDialog: false,
+      showDebug: false,
       
       assignForm: {
         committee_id: null,
@@ -160,44 +226,118 @@ export default {
   methods: {
     async loadPeriods() {
       try {
+        console.log('🔄 Loading periods...')
         const response = await api.get('/periods')
-        if (response.success) {
-          this.periods = response.data.periods || []
+        console.log('📡 Periods response:', response)
+        
+        if (response && response.success && response.data) {
+          this.periods = response.data.periods || response.data || []
+          console.log('✅ Periods loaded:', this.periods)
+        } else {
+          console.warn('⚠️ Invalid periods response:', response)
+          this.periods = []
         }
       } catch (error) {
-        this.error = 'ไม่สามารถโหลดรอบการประเมินได้'
+        console.error('🔴 Load periods error:', error)
+        this.error = `ไม่สามารถโหลดรอบการประเมินได้: ${error.message}`
+        this.periods = []
       }
     },
 
     async loadUsers() {
       try {
+        console.log('🔄 Loading users...')
         const [committeeRes, evaluateeRes] = await Promise.all([
           api.get('/users?role=committee'),
           api.get('/users?role=evaluatee')
         ])
         
-        if (committeeRes.success) {
-          this.committees = committeeRes.data || []
+        console.log('📡 Committee response:', committeeRes)
+        console.log('📡 Evaluatee response:', evaluateeRes)
+        
+        if (committeeRes && committeeRes.success && committeeRes.data) {
+          this.committees = committeeRes.data.users || committeeRes.data || []
+          console.log('✅ Committees loaded:', this.committees)
+        } else {
+          console.warn('⚠️ Invalid committee response:', committeeRes)
+          this.committees = []
         }
-        if (evaluateeRes.success) {
-          this.evaluatees = evaluateeRes.data || []
+        
+        if (evaluateeRes && evaluateeRes.success && evaluateeRes.data) {
+          this.evaluatees = evaluateeRes.data.users || evaluateeRes.data || []
+          console.log('✅ Evaluatees loaded:', this.evaluatees)
+        } else {
+          console.warn('⚠️ Invalid evaluatee response:', evaluateeRes)
+          this.evaluatees = []
         }
+        
       } catch (error) {
-        this.error = 'ไม่สามารถโหลดรายชื่อผู้ใช้ได้'
+        console.error('🔴 Load users error:', error)
+        this.error = `ไม่สามารถโหลดรายชื่อผู้ใช้ได้: ${error.message}`
+        this.committees = []
+        this.evaluatees = []
       }
     },
 
     async loadAssignments() {
-      if (!this.selectedPeriod) return
+      if (!this.selectedPeriod) {
+        console.log('🔍 No period selected')
+        return
+      }
       
       this.loading = true
       try {
+        console.log('🔄 Loading assignments for period:', this.selectedPeriod)
         const response = await api.get(`/committee/assignments?period_id=${this.selectedPeriod}`)
-        if (response.success) {
-          this.assignments = response.data || []
+        console.log('📡 Raw assignments response:', response)
+        console.log('📡 Response data type:', typeof response.data)
+        console.log('📡 Response data is array:', Array.isArray(response.data))
+        
+        if (response && response.success && response.data) {
+          // แก้ไขตรงนี้ - ตรวจสอบว่า data เป็น Array หรือไม่
+          let assignmentsData = response.data
+          
+          // ถ้า data ไม่ใช่ Array แต่เป็น Object ที่มี property assignments หรือ data
+          if (!Array.isArray(assignmentsData)) {
+            console.log('📡 Data is not array, checking for nested data...')
+            assignmentsData = assignmentsData.assignments || 
+                             assignmentsData.data || 
+                             assignmentsData.items || 
+                             []
+            console.log('📡 Extracted assignments data:', assignmentsData)
+          }
+          
+          // ตรวจสอบอีกครั้งว่าเป็น Array
+          if (!Array.isArray(assignmentsData)) {
+            console.error('🔴 Data is still not an array:', assignmentsData)
+            this.assignments = []
+            this.error = 'ข้อมูลที่ได้รับจาก API ไม่ถูกต้อง (ไม่ใช่ Array)'
+            return
+          }
+          
+          // แก้ไขตรงนี้ - เพิ่ม mapping ชื่อ
+          this.assignments = assignmentsData.map(assignment => {
+            // ถ้าไม่มี committee_name หรือ evaluatee_name ให้ lookup จาก arrays
+            const committee = this.committees.find(c => c.id === assignment.committee_id)
+            const evaluatee = this.evaluatees.find(e => e.id === assignment.evaluatee_id)
+            
+            return {
+              ...assignment,
+              committee_name: assignment.committee_name || committee?.full_name || `Committee ID: ${assignment.committee_id}`,
+              evaluatee_name: assignment.evaluatee_name || evaluatee?.full_name || `Evaluatee ID: ${assignment.evaluatee_id}`,
+              assigned_at: assignment.assigned_at || assignment.created_at || new Date().toISOString()
+            }
+          })
+          
+          console.log('✅ Processed assignments:', this.assignments)
+        } else {
+          console.warn('⚠️ Invalid assignments response:', response)
+          this.assignments = []
         }
       } catch (error) {
-        this.error = 'ไม่สามารถโหลดการมอบหมายได้'
+        console.error('🔴 Load assignments error:', error)
+        this.error = `ไม่สามารถโหลดการมอบหมายได้: ${error.message}`
+        this.assignments = []
       } finally {
         this.loading = false
       }
@@ -220,16 +360,24 @@ export default {
 
       this.saving = true
       try {
-        await api.post('/committee/assignments', {
+        console.log('💾 Saving assignment:', this.assignForm)
+        
+        const response = await api.post('/committee/assignments', {
           ...this.assignForm,
           period_id: this.selectedPeriod
         })
         
+        console.log('✅ Save response:', response)
+        
         this.assignDialog = false
         this.successMessage = 'มอบหมายกรรมการสำเร็จ'
+        
+        // สำคัญ: รีโหลดข้อมูลใหม่ทันที
         await this.loadAssignments()
+        
       } catch (error) {
-        this.error = 'ไม่สามารถมอบหมายกรรมการได้'
+        console.error('🔴 Save assignment error:', error)
+        this.error = `ไม่สามารถมอบหมายกรรมการได้: ${error.message}`
       } finally {
         this.saving = false
       }
@@ -239,17 +387,47 @@ export default {
       if (!confirm('คุณแน่ใจหรือไม่ที่จะยกเลิกการมอบหมายนี้?')) return
 
       try {
-        await api.delete(`/committee/assignments/${assignmentId}`)
+        console.log('🗑️ Deleting assignment:', assignmentId)
+        const response = await api.delete(`/committee/assignments/${assignmentId}`)
+        console.log('✅ Delete response:', response)
+        
         this.successMessage = 'ยกเลิกการมอบหมายสำเร็จ'
         await this.loadAssignments()
       } catch (error) {
-        this.error = 'ไม่สามารถยกเลิกการมอบหมายได้'
+        console.error('🔴 Delete assignment error:', error)
+        this.error = `ไม่สามารถยกเลิกการมอบหมายได้: ${error.message}`
       }
     },
 
+    debugData() {
+      console.log('🔍 DEBUG DATA:')
+      console.log('selectedPeriod:', this.selectedPeriod)
+      console.log('assignments.length:', this.assignments.length)
+      console.log('assignments:', this.assignments)
+      console.log('committees.length:', this.committees.length)
+      console.log('committees:', this.committees)
+      console.log('evaluatees.length:', this.evaluatees.length)
+      console.log('evaluatees:', this.evaluatees)
+      console.log('periods:', this.periods)
+    },
+
     formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString('th-TH')
+      if (!dateString) return '-'
+      try {
+        return new Date(dateString).toLocaleDateString('th-TH')
+      } catch (error) {
+        return dateString
+      }
     }
   }
 }
 </script>
+
+<style scoped>
+.v-expansion-panel-text pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+</style>
