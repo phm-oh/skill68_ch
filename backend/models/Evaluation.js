@@ -1,5 +1,5 @@
 // backend/models/Evaluation.js
-// Model สำหรับจัดการการประเมิน
+// Model สำหรับจัดการการประเมิน (FIXED VERSION)
 
 const db = require('../config/database');
 
@@ -76,7 +76,7 @@ class Evaluation {
     }
   }
 
-  // สร้างการประเมินใหม่หรืออัปเดต (Self Assessment)
+  // สร้างการประเมินใหม่หรืออัปเดต (Self Assessment) - FIXED
   static async createOrUpdateSelf(evaluationData) {
     const {
       user_id,
@@ -91,6 +91,16 @@ class Evaluation {
     } = evaluationData;
     
     try {
+      // แปลง undefined เป็น null เพื่อป้องกัน SQL error
+      const safeComment = self_comment || null;
+      const safeEvidenceText = evidence_text || null;
+      const safeEvidenceFiles = evidence_files && evidence_files.length > 0 
+        ? JSON.stringify(evidence_files) 
+        : null;
+      const safeEvidenceUrls = evidence_urls && evidence_urls.length > 0 
+        ? JSON.stringify(evidence_urls) 
+        : null;
+      
       // ตรวจสอบว่ามีการประเมินอยู่แล้วหรือไม่
       const [existing] = await db.execute(
         'SELECT id FROM user_evaluations WHERE user_id = ? AND criteria_id = ? AND period_id = ?',
@@ -108,10 +118,10 @@ class Evaluation {
         `, [
           self_selected_option_id, 
           self_score, 
-          self_comment,
-          evidence_files ? JSON.stringify(evidence_files) : null,
-          evidence_urls ? JSON.stringify(evidence_urls) : null,
-          evidence_text,
+          safeComment,
+          safeEvidenceFiles,
+          safeEvidenceUrls,
+          safeEvidenceText,
           existing[0].id
         ]);
         
@@ -129,10 +139,10 @@ class Evaluation {
           period_id, 
           self_selected_option_id, 
           self_score, 
-          self_comment,
-          evidence_files ? JSON.stringify(evidence_files) : null,
-          evidence_urls ? JSON.stringify(evidence_urls) : null,
-          evidence_text
+          safeComment,
+          safeEvidenceFiles,
+          safeEvidenceUrls,
+          safeEvidenceText
         ]);
         
         return result.insertId;
@@ -142,14 +152,20 @@ class Evaluation {
     }
   }
 
-  // ส่งการประเมิน (Submit)
+  // ส่งการประเมิน (Submit) - FIXED
   static async submit(userId, periodId) {
     try {
+      // อัปเดตทุก record ที่เป็น draft หรือ null และมีคะแนน
       const [result] = await db.execute(`
         UPDATE user_evaluations 
         SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
-        WHERE user_id = ? AND period_id = ? AND status = 'draft'
+        WHERE user_id = ? 
+          AND period_id = ? 
+          AND (status = 'draft' OR status IS NULL)
+          AND self_score IS NOT NULL
       `, [userId, periodId]);
+      
+      console.log(`✅ Updated ${result.affectedRows} evaluations to submitted`);
       
       return result.affectedRows;
     } catch (error) {
@@ -241,7 +257,7 @@ class Evaluation {
 
       return {
         total_score: weightedScore,
-        max_score: 4.0, // สเกลสูงสุด
+        max_score: 4.0,
         percentage: (weightedScore / 4.0) * 100,
         topic_scores: topicScores
       };

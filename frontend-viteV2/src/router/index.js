@@ -6,6 +6,8 @@ import { useAuthStore } from '../stores/auth.js'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import HRDashboard from '../views/hr/Dashboard.vue'
+import EvaluateeDashboard from '../views/evaluatee/Dashboard.vue'
+import CommitteeDashboard from '../views/committee/Dashboard.vue'
 
 const routes = [
   {
@@ -47,7 +49,7 @@ const routes = [
   {
     path: '/evaluatee/dashboard',
     name: 'evaluatee-dashboard',
-    component: () => import('../views/evaluatee/Dashboard.vue'),
+    component: EvaluateeDashboard,
     meta: { requiresAuth: true, role: 'evaluatee' }
   },
   
@@ -60,7 +62,7 @@ const routes = [
   {
     path: '/committee/dashboard',
     name: 'committee-dashboard',
-    component: () => import('../views/committee/Dashboard.vue'),
+    component: CommitteeDashboard,
     meta: { requiresAuth: true, role: 'committee' }
   },
 
@@ -88,7 +90,6 @@ router.beforeEach((to, from, next) => {
     
     // ตรวจสอบ role
     if (to.meta.role && authStore.user?.role !== to.meta.role) {
-      // Redirect ไปหน้าที่ถูกต้องตาม role
       return next(authStore.getDefaultRoute())
     }
   }

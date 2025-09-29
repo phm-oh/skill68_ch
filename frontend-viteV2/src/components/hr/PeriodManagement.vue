@@ -1,4 +1,4 @@
-<!-- frontend-viteV2/src/components/hr/PeriodManagement.vue -->
+<!-- frontend-viteV2/src/components/hr/PeriodManagement.vue  -->
 <template>
   <v-container>
     <!-- Header -->
@@ -131,50 +131,40 @@
           <v-text-field
             v-model="form.period_name"
             label="ชื่อรอบการประเมิน *"
+            density="comfortable"
             variant="outlined"
-            density="compact"
-            placeholder="เช่น การประเมินไตรมาส 1/2568"
-            :disabled="saving"
+            :error-messages="form.period_name ? [] : ['กรุณากรอกชื่อรอบ']"
           />
 
           <v-textarea
             v-model="form.description"
             label="คำอธิบาย"
+            density="comfortable"
             variant="outlined"
-            density="compact"
-            rows="2"
-            placeholder="รายละเอียดของรอบการประเมิน (ไม่บังคับ)"
-            :disabled="saving"
+            rows="3"
           />
 
-          <v-row>
-            <v-col cols="6">
-              <v-text-field
-                v-model="form.start_date"
-                label="วันเริ่มต้น *"
-                type="date"
-                variant="outlined"
-                density="compact"
-                :disabled="saving"
-              />
-            </v-col>
-            <v-col cols="6">
-              <v-text-field
-                v-model="form.end_date"
-                label="วันสิ้นสุด *"
-                type="date"
-                variant="outlined"
-                density="compact"
-                :disabled="saving"
-              />
-            </v-col>
-          </v-row>
+          <v-text-field
+            v-model="form.start_date"
+            label="วันเริ่มต้น *"
+            type="date"
+            density="comfortable"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="form.end_date"
+            label="วันสิ้นสุด *"
+            type="date"
+            density="comfortable"
+            variant="outlined"
+          />
 
           <v-switch
             v-model="form.is_active"
-            label="เปิดใช้งานทันที"
-            color="primary"
-            :disabled="saving"
+            label="เปิดใช้งาน"
+            color="success"
+            hide-details
           />
         </v-card-text>
 
@@ -293,8 +283,8 @@ export default {
       this.form = {
         period_name: period.period_name,
         description: period.description || '',
-        start_date: period.start_date,
-        end_date: period.end_date,
+        start_date: period.start_date.split('T')[0], // แปลงจาก ISO เป็น yyyy-MM-dd
+        end_date: period.end_date.split('T')[0],
         is_active: period.is_active
       }
       this.dialog = true
@@ -359,7 +349,7 @@ export default {
         
       } catch (error) {
         console.error('Error saving period:', error)
-        this.error = error.message || 'ไม่สามารถบันทึกรอบการประเมินได้'
+        this.error = error.response?.data?.message || error.message || 'ไม่สามารถบันทึกรอบการประเมินได้'
       } finally {
         this.saving = false
       }
@@ -383,7 +373,7 @@ export default {
         await this.loadPeriods()
       } catch (error) {
         console.error('Error deleting period:', error)
-        this.error = error.message || 'ไม่สามารถลบรอบการประเมินได้'
+        this.error = error.response?.data?.message || error.message || 'ไม่สามารถลบรอบการประเมินได้'
       } finally {
         this.deleting = false
       }
