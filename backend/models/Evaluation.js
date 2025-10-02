@@ -28,7 +28,7 @@ class Evaluation {
         WHERE ue.user_id = ? AND ue.period_id = ?
         ORDER BY et.sort_order ASC, ec.sort_order ASC
       `, [userId, periodId]);
-      
+
       return rows;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการดึงการประเมิน: ' + error.message);
@@ -56,19 +56,19 @@ class Evaluation {
         JOIN evaluation_periods ep ON ue.period_id = ep.id
         WHERE ca.committee_id = ?
       `;
-      
+
       let params = [committeeId];
-      
+
       if (periodId) {
         query += ' AND ue.period_id = ?';
         params.push(periodId);
       }
-      
+
       query += `
         GROUP BY ue.user_id, ue.period_id, u.full_name, u.department, u.position, ep.period_name, ca.role
         ORDER BY ep.start_date DESC, u.full_name ASC
       `;
-      
+
       const [rows] = await db.execute(query, params);
       return rows;
     } catch (error) {
@@ -89,18 +89,18 @@ class Evaluation {
       evidence_urls,
       evidence_text
     } = evaluationData;
-    
+
     try {
       // แปลง undefined เป็น null เพื่อป้องกัน SQL error
       const safeComment = self_comment || null;
       const safeEvidenceText = evidence_text || null;
-      const safeEvidenceFiles = evidence_files && evidence_files.length > 0 
-        ? JSON.stringify(evidence_files) 
+      const safeEvidenceFiles = evidence_files && evidence_files.length > 0
+        ? JSON.stringify(evidence_files)
         : null;
-      const safeEvidenceUrls = evidence_urls && evidence_urls.length > 0 
-        ? JSON.stringify(evidence_urls) 
+      const safeEvidenceUrls = evidence_urls && evidence_urls.length > 0
+        ? JSON.stringify(evidence_urls)
         : null;
-      
+
       // ตรวจสอบว่ามีการประเมินอยู่แล้วหรือไม่
       const [existing] = await db.execute(
         'SELECT id FROM user_evaluations WHERE user_id = ? AND criteria_id = ? AND period_id = ?',
@@ -116,15 +116,15 @@ class Evaluation {
               status = 'draft', updated_at = NOW()
           WHERE id = ?
         `, [
-          self_selected_option_id, 
-          self_score, 
+          self_selected_option_id,
+          self_score,
           safeComment,
           safeEvidenceFiles,
           safeEvidenceUrls,
           safeEvidenceText,
           existing[0].id
         ]);
-        
+
         return existing[0].id;
       } else {
         // สร้างใหม่
@@ -134,17 +134,17 @@ class Evaluation {
            evidence_files, evidence_urls, evidence_text, status, created_at) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())
         `, [
-          user_id, 
-          criteria_id, 
-          period_id, 
-          self_selected_option_id, 
-          self_score, 
+          user_id,
+          criteria_id,
+          period_id,
+          self_selected_option_id,
+          self_score,
           safeComment,
           safeEvidenceFiles,
           safeEvidenceUrls,
           safeEvidenceText
         ]);
-        
+
         return result.insertId;
       }
     } catch (error) {
@@ -164,9 +164,9 @@ class Evaluation {
           AND (status = 'draft' OR status IS NULL)
           AND self_score IS NOT NULL
       `, [userId, periodId]);
-      
+
       console.log(`✅ Updated ${result.affectedRows} evaluations to submitted`);
-      
+
       return result.affectedRows;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการส่งการประเมิน: ' + error.message);
@@ -182,7 +182,7 @@ class Evaluation {
       committee_comment,
       committee_evaluated_by
     } = evaluationData;
-    
+
     try {
       const [result] = await db.execute(`
         UPDATE user_evaluations 
@@ -196,7 +196,7 @@ class Evaluation {
         committee_evaluated_by,
         evaluation_id
       ]);
-      
+
       return result.affectedRows > 0;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการประเมินโดยกรรมการ: ' + error.message);
@@ -212,7 +212,7 @@ class Evaluation {
         SET status = 'approved', updated_at = NOW()
         WHERE id IN (${placeholders}) AND status = 'evaluated'
       `, evaluationIds);
-      
+
       return result.affectedRows;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการอนุมัติการประเมิน: ' + error.message);
@@ -239,13 +239,13 @@ class Evaluation {
 
       let totalScore = 0;
       let weightedScore = 0;
-      
+
       const topicScores = rows.map(row => {
         const topicAverage = row.topic_max_score > 0 ? (row.topic_total_score / row.topic_max_score) : 0;
         const weightedTopicScore = topicAverage * (row.weight_percentage / 100);
-        
+
         weightedScore += weightedTopicScore;
-        
+
         return {
           topic_id: row.topic_id,
           topic_name: row.topic_name,
@@ -316,7 +316,7 @@ class Evaluation {
         LEFT JOIN users evaluator ON ue.committee_evaluated_by = evaluator.id
         WHERE ue.id = ?
       `, [id]);
-      
+
       return rows[0] || null;
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการค้นหาการประเมิน: ' + error.message);
@@ -324,29 +324,48 @@ class Evaluation {
   }
 
   // ตรวจสอบสถานะการประเมิน
+  // ตรวจสอบสถานะการประเมิน
   static async getEvaluationStatus(userId, periodId) {
     try {
+      // นับจำนวน criteria ทั้งหมดในรอบนี้
+      const [totalCriteria] = await db.execute(`
+      SELECT COUNT(*) as total
+      FROM evaluation_criteria ec
+      JOIN evaluation_topics et ON ec.topic_id = et.id
+      WHERE et.period_id = ?
+    `, [periodId]);
+
+      // นับสถานะการประเมินที่มีอยู่
       const [rows] = await db.execute(`
-        SELECT 
-          COUNT(*) as total_criteria,
-          SUM(CASE WHEN ue.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
-          SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
-          SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count,
-          SUM(CASE WHEN ue.status = 'approved' THEN 1 ELSE 0 END) as approved_count
-        FROM user_evaluations ue
-        JOIN evaluation_criteria ec ON ue.criteria_id = ec.id
-        JOIN evaluation_topics et ON ec.topic_id = et.id
-        WHERE ue.user_id = ? AND ue.period_id = ?
-      `, [userId, periodId]);
+      SELECT 
+        COUNT(*) as saved_criteria,
+        SUM(CASE WHEN ue.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
+        SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
+        SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count,
+        SUM(CASE WHEN ue.status = 'approved' THEN 1 ELSE 0 END) as approved_count
+      FROM user_evaluations ue
+      WHERE ue.user_id = ? AND ue.period_id = ?
+    `, [userId, periodId]);
 
       const status = rows[0];
-      const completionRate = status.total_criteria > 0 ? 
-        ((status.submitted_count + status.evaluated_count + status.approved_count) / status.total_criteria) * 100 : 0;
+      const totalRequired = totalCriteria[0].total;
+      const savedCount = status.saved_criteria || 0;
+
+      const completionRate = totalRequired > 0 ?
+        ((status.submitted_count + status.evaluated_count + status.approved_count) / totalRequired) * 100 : 0;
+
+      // สามารถส่งได้ต่อเมื่อ: บันทึกครบทุก criteria และมี draft อย่างน้อย 1 อัน
+      const canSubmit = savedCount === totalRequired && totalRequired > 0 && status.draft_count > 0;
 
       return {
-        ...status,
+        total_criteria: totalRequired,
+        saved_criteria: savedCount,
+        draft_count: status.draft_count || 0,
+        submitted_count: status.submitted_count || 0,
+        evaluated_count: status.evaluated_count || 0,
+        approved_count: status.approved_count || 0,
         completion_rate: completionRate,
-        can_submit: status.draft_count === 0 && status.total_criteria > 0
+        can_submit: canSubmit
       };
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการตรวจสอบสถานะ: ' + error.message);

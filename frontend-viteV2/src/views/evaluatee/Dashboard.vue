@@ -1,69 +1,59 @@
-<!-- frontend-viteV2/src/views/evaluatee/Dashboard.vue (FIXED) -->
 <template>
   <v-app>
-    <v-app-bar color="success" dark>
-      <v-app-bar-title>ผู้รับการประเมิน - {{ user.full_name }}</v-app-bar-title>
-      <v-spacer />
-      <v-btn icon @click="logout">
-        <v-icon>mdi-logout</v-icon>
-      </v-btn>
-    </v-app-bar>
-
     <v-main>
-      <v-container>
-        <!-- Debug Info -->
-        <v-card v-if="showDebug" class="mb-4" color="blue-grey-lighten-5">
-          <v-card-title>Debug Info</v-card-title>
-          <v-card-text>
-            <p><strong>Active Period:</strong> {{ activePeriod?.id }} - {{ activePeriod?.period_name }}</p>
-            <p><strong>Topics:</strong> {{ topics.length }}</p>
-            <p><strong>Total Criteria:</strong> {{ total }}</p>
-            <p><strong>Evaluations:</strong> {{ Array.isArray(evaluations) ? evaluations.length : 'Not Array!' }}</p>
-            <p><strong>Is Submitted:</strong> {{ isSubmitted }}</p>
-            <v-btn size="small" @click="showDebug = false">ซ่อน</v-btn>
-          </v-card-text>
+      <v-container fluid>
+        <h1 class="text-h4 mb-4">ผู้รับการประเมิน - sss-test</h1>
+
+        <!-- Debug Panel -->
+        <v-card v-if="showDebug" class="mb-4 pa-3 bg-grey-lighten-4">
+          <h3>🔍 Debug Info</h3>
+          <pre>{{ { activePeriod, topics: topics.length, evaluations: evaluations.length } }}</pre>
         </v-card>
 
         <!-- รอบการประเมินปัจจุบัน -->
-        <v-card class="mb-6">
-          <v-card-title>
-            <v-icon class="mr-2">mdi-calendar-clock</v-icon>
+        <v-card class="mb-4">
+          <v-card-title class="d-flex align-center">
+            <v-icon class="mr-2">mdi-calendar-check</v-icon>
             รอบการประเมินปัจจุบัน
-            <v-btn size="small" color="grey" @click="showDebug = !showDebug" class="ml-2">
-              Debug
-            </v-btn>
+            <v-chip class="ml-2" color="success" size="small" v-if="activePeriod">
+              DEBUG
+            </v-chip>
           </v-card-title>
+          
           <v-card-text>
-            <div v-if="loading">
-              <v-progress-circular indeterminate color="primary" />
-              <p class="mt-2">กำลังโหลดข้อมูล...</p>
-            </div>
-
-            <div v-else-if="activePeriod">
+            <div v-if="activePeriod">
               <h3>{{ activePeriod.period_name }}</h3>
-              <p>{{ activePeriod.description }}</p>
-              
-              <v-progress-linear
-                :model-value="progress"
-                color="success"
-                height="20"
-                class="my-4"
-              >
-                <template v-slot:default>
-                  <strong>{{ Math.ceil(progress) }}%</strong>
-                </template>
-              </v-progress-linear>
-              
-              <p>ความคืบหน้า: {{ completed }}/{{ total }} ตัวชี้วัด</p>
-              
+              <p class="text-grey">
+                {{ activePeriod.description }}
+              </p>
+              <p class="mt-2">
+                <strong>ช่วงเวลา:</strong> 
+                {{ new Date(activePeriod.start_date).toLocaleDateString('th-TH') }} - 
+                {{ new Date(activePeriod.end_date).toLocaleDateString('th-TH') }}
+              </p>
+
+              <!-- Progress Bar -->
               <div class="mt-4">
-                <v-btn 
-                  color="primary" 
-                  size="large"
-                  @click="openEvaluationDialog"
-                  :disabled="isSubmitted || total === 0"
-                  class="mr-2"
+                <p><strong>ความคืบหน้า:</strong> {{ completed }}/{{ total }} ตัวชี้วัด</p>
+                <v-progress-linear
+                  :model-value="progress"
+                  color="success"
+                  height="25"
+                  class="mb-2"
                 >
+                  <strong>{{ Math.ceil(progress) }}%</strong>
+                </v-progress-linear>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="d-flex gap-2 mt-4">
+                <v-btn 
+                  :color="isSubmitted ? 'success' : 'primary'"
+                  size="large"
+                  @click="openEvaluation"
+                  :disabled="isSubmitted"
+                >
+                  <v-icon left>mdi-pencil</v-icon>
                   {{ isSubmitted ? 'ส่งการประเมินแล้ว' : 'เริ่มประเมิน' }}
                 </v-btn>
 
@@ -89,7 +79,7 @@
                 </v-btn>
               </div>
 
-              <!-- แสดงหัวข้อและตัวชี้วัด (สำหรับ debug) -->
+              <!-- แสดงหัวข้อและตัวชี้วัด -->
               <v-expansion-panels v-if="topics.length > 0" class="mt-4">
                 <v-expansion-panel v-for="topic in topics" :key="topic.id">
                   <v-expansion-panel-title>
@@ -117,7 +107,7 @@
         </v-card>
 
         <!-- คะแนนของฉัน (ถ้ามี) -->
-        <v-card v-if="score && isSubmitted">
+        <v-card v-if="score && isSubmitted" class="mb-4">
           <v-card-title>
             <v-icon class="mr-2">mdi-star</v-icon>
             คะแนนการประเมิน
@@ -141,7 +131,7 @@
           <EvaluationForm
             v-if="evaluationDialog && activePeriod"
             :period-id="activePeriod.id"
-            @close="evaluationDialog = false"
+            @close="closeEvaluation"
             @submitted="handleSubmitted"
           />
         </v-dialog>
@@ -179,7 +169,7 @@ export default {
       showDebug: false,
       activePeriod: null,
       topics: [],
-      evaluations: [], // ต้องเป็น Array เสมอ!
+      evaluations: [],
       score: null,
       evaluationDialog: false,
       reportDialog: false,
@@ -215,7 +205,7 @@ export default {
         console.log('📋 Loading topics for period:', this.activePeriod.id)
         const topicsRes = await topicService.getTopicsByPeriod(
           this.activePeriod.id, 
-          Date.now() // ป้องกัน cache
+          Date.now()
         )
         
         console.log('📦 Topics response:', topicsRes)
@@ -231,88 +221,108 @@ export default {
         
         console.log('✅ Topics loaded:', this.topics.length)
 
-        // 3. นับจำนวนตัวชี้วัดทั้งหมด
-        this.total = 0
-        this.topics.forEach(topic => {
-          const criteriaCount = topic.criteria?.length || 0
-          console.log(`  - ${topic.topic_name}: ${criteriaCount} criteria`)
-          this.total += criteriaCount
-        })
-        console.log('📊 Total criteria:', this.total)
-
-        // 4. โหลดการประเมินของตนเอง
+        // 3. โหลดการประเมินของตัวเอง
         console.log('📝 Loading my evaluations...')
-        const evalRes = await evaluationService.getMyEvaluations(this.activePeriod.id)
-        
-        // ตรวจสอบว่าเป็น Array หรือไม่
-        if (Array.isArray(evalRes.data)) {
-          this.evaluations = evalRes.data
-        } else if (evalRes.data && typeof evalRes.data === 'object') {
-          this.evaluations = [evalRes.data]
-        } else {
-          this.evaluations = []
-        }
-        
+        const evaluationsRes = await evaluationService.getMyEvaluations(this.activePeriod.id)
+        this.evaluations = Array.isArray(evaluationsRes.data) ? evaluationsRes.data : []
         console.log('✅ Evaluations loaded:', this.evaluations.length)
 
-        // 5. นับที่กรอกแล้ว
-        this.completed = this.evaluations.filter(e => e.self_score !== null).length
-        this.progress = this.total > 0 ? (this.completed / this.total) * 100 : 0
-        console.log('📈 Progress:', this.completed, '/', this.total, '=', this.progress.toFixed(2), '%')
-
-        // 6. ตรวจสอบสถานะส่งแล้ว
-        this.isSubmitted = this.evaluations.some(e => 
-          e.status === 'submitted' || 
-          e.status === 'evaluated' || 
-          e.status === 'approved'
-        )
-        console.log('📮 Is submitted:', this.isSubmitted)
-
-        // 7. โหลดคะแนน (ถ้าส่งแล้ว)
-        if (this.isSubmitted) {
-          console.log('⭐ Loading score...')
-          const scoreRes = await evaluationService.getScore(this.activePeriod.id)
-          this.score = scoreRes.data || null
-          console.log('✅ Score:', this.score)
-        }
+        // 4. คำนวณความคืบหน้า
+        this.calculateProgress()
 
         console.log('✅ Dashboard loaded successfully!')
+        console.log('📊 Total criteria:', this.total)
+        console.log('📊 Topics loaded:', this.topics.length)
         
       } catch (err) {
         console.error('❌ Load data error:', err)
-        console.error('Error details:', err.response?.data || err.message)
       } finally {
         this.loading = false
       }
     },
 
-    openEvaluationDialog() {
-      if (this.total === 0) {
-        alert('ไม่พบหัวข้อการประเมินในรอบนี้')
+    calculateProgress() {
+      // นับจำนวน criteria ทั้งหมด
+      this.total = this.topics.reduce((sum, topic) => {
+        return sum + (topic.criteria?.length || 0)
+      }, 0)
+
+      // นับจำนวน criteria ที่ทำเสร็จ
+      this.completed = this.evaluations.filter(e => 
+        e.status === 'submitted' || e.status === 'evaluated'
+      ).length
+
+      // คำนวณเปอร์เซ็นต์
+      this.progress = this.total > 0 ? (this.completed / this.total) * 100 : 0
+
+      // เช็คว่าส่งหมดแล้วหรือยัง
+      this.isSubmitted = this.evaluations.some(e => e.status === 'submitted')
+
+      console.log('📊 Progress:', {
+        total: this.total,
+        completed: this.completed,
+        progress: this.progress,
+        isSubmitted: this.isSubmitted
+      })
+    },
+
+    openEvaluation() {
+      console.log('🎯 Opening evaluation form...')
+      console.log('📋 Active period:', this.activePeriod)
+      console.log('📋 Topics available:', this.topics.length)
+      
+      // ⭐ เช็คเงื่อนไขก่อนเปิด Dialog
+      if (!this.activePeriod) {
+        alert('❌ ไม่พบรอบการประเมินที่เปิดอยู่')
         return
       }
+
+      if (this.topics.length === 0) {
+        alert('❌ ไม่พบหัวข้อการประเมินในรอบนี้\n\nกรุณาติดต่อ HR เพื่อเพิ่มหัวข้อการประเมิน')
+        return
+      }
+
+      // ตรวจสอบว่ามี criteria หรือไม่
+      const totalCriteria = this.topics.reduce((sum, t) => sum + (t.criteria?.length || 0), 0)
+      if (totalCriteria === 0) {
+        alert('❌ ไม่พบตัวชี้วัดในหัวข้อการประเมิน\n\nกรุณาติดต่อ HR เพื่อเพิ่มตัวชี้วัด')
+        return
+      }
+
+      // เปิด Dialog
       this.evaluationDialog = true
     },
 
-    viewReport() {
-      this.reportDialog = true
+    closeEvaluation() {
+      this.evaluationDialog = false
+      this.loadData() // Reload data
     },
 
     async handleSubmitted() {
+      console.log('✅ Evaluation submitted!')
       this.evaluationDialog = false
       await this.loadData()
     },
 
-    getScoreColor(percentage) {
-      if (percentage >= 80) return 'green'
-      if (percentage >= 60) return 'orange'
-      return 'red'
+    viewReport() {
+      if (!this.isSubmitted) {
+        alert('⚠️ กรุณาส่งการประเมินก่อน')
+        return
+      }
+      this.reportDialog = true
     },
 
-    logout() {
-      localStorage.clear()
-      this.$router.push('/login')
+    getScoreColor(percentage) {
+      if (percentage >= 80) return 'success'
+      if (percentage >= 60) return 'warning'
+      return 'error'
     }
   }
 }
 </script>
+
+<style scoped>
+.gap-2 {
+  gap: 8px;
+}
+</style>
