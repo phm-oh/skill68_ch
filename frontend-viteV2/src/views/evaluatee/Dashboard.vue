@@ -19,7 +19,7 @@
               DEBUG
             </v-chip>
           </v-card-title>
-          
+
           <v-card-text>
             <div v-if="activePeriod">
               <h3>{{ activePeriod.period_name }}</h3>
@@ -27,53 +27,33 @@
                 {{ activePeriod.description }}
               </p>
               <p class="mt-2">
-                <strong>ช่วงเวลา:</strong> 
-                {{ new Date(activePeriod.start_date).toLocaleDateString('th-TH') }} - 
+                <strong>ช่วงเวลา:</strong>
+                {{ new Date(activePeriod.start_date).toLocaleDateString('th-TH') }} -
                 {{ new Date(activePeriod.end_date).toLocaleDateString('th-TH') }}
               </p>
 
               <!-- Progress Bar -->
               <div class="mt-4">
                 <p><strong>ความคืบหน้า:</strong> {{ completed }}/{{ total }} ตัวชี้วัด</p>
-                <v-progress-linear
-                  :model-value="progress"
-                  color="success"
-                  height="25"
-                  class="mb-2"
-                >
+                <v-progress-linear :model-value="progress" color="success" height="25" class="mb-2">
                   <strong>{{ Math.ceil(progress) }}%</strong>
                 </v-progress-linear>
               </div>
 
               <!-- Action Buttons -->
               <div class="d-flex gap-2 mt-4">
-                <v-btn 
-                  :color="isSubmitted ? 'success' : 'primary'"
-                  size="large"
-                  @click="openEvaluation"
-                  :disabled="isSubmitted"
-                >
+                <v-btn :color="isSubmitted ? 'success' : 'primary'" size="large" @click="openEvaluation"
+                  :disabled="isSubmitted">
                   <v-icon left>mdi-pencil</v-icon>
                   {{ isSubmitted ? 'ส่งการประเมินแล้ว' : 'เริ่มประเมิน' }}
                 </v-btn>
 
-                <v-btn 
-                  color="info" 
-                  size="large"
-                  @click="viewReport"
-                  :disabled="!isSubmitted"
-                >
+                <v-btn color="info" size="large" @click="viewReport" :disabled="!isSubmitted">
                   <v-icon left>mdi-file-chart</v-icon>
                   ดูรายงาน
                 </v-btn>
 
-                <v-btn 
-                  color="grey" 
-                  size="large"
-                  @click="loadData"
-                  :loading="loading"
-                  class="ml-2"
-                >
+                <v-btn color="grey" size="large" @click="loadData" :loading="loading" class="ml-2">
                   <v-icon left>mdi-refresh</v-icon>
                   โหลดใหม่
                 </v-btn>
@@ -116,33 +96,21 @@
             <div class="text-center">
               <h1 class="text-h2 mb-2">{{ score.total_score?.toFixed(2) || 0 }}</h1>
               <p class="text-h6">จากคะแนนเต็ม {{ score.max_score || 100 }}</p>
-              <v-progress-linear
-                :model-value="score.percentage || 0"
-                :color="getScoreColor(score.percentage)"
-                height="10"
-                class="mt-4"
-              />
+              <v-progress-linear :model-value="score.percentage || 0" :color="getScoreColor(score.percentage)"
+                height="10" class="mt-4" />
             </div>
           </v-card-text>
         </v-card>
 
         <!-- Evaluation Dialog -->
         <v-dialog v-model="evaluationDialog" max-width="900" persistent>
-          <EvaluationForm
-            v-if="evaluationDialog && activePeriod"
-            :period-id="activePeriod.id"
-            @close="closeEvaluation"
-            @submitted="handleSubmitted"
-          />
+          <EvaluationForm v-if="evaluationDialog && activePeriod" :period-id="activePeriod.id" @close="closeEvaluation"
+            @submitted="handleSubmitted" />
         </v-dialog>
 
         <!-- Report Dialog -->
         <v-dialog v-model="reportDialog" max-width="900">
-          <ViewReport
-            v-if="reportDialog && activePeriod"
-            :period-id="activePeriod.id"
-            @close="reportDialog = false"
-          />
+          <ViewReport v-if="reportDialog && activePeriod" :period-id="activePeriod.id" @close="reportDialog = false" />
         </v-dialog>
       </v-container>
     </v-main>
@@ -186,7 +154,7 @@ export default {
     async loadData() {
       this.loading = true
       console.log('🔄 Loading evaluatee dashboard data...')
-      
+
       try {
         // 1. โหลดรอบการประเมินที่เปิดอยู่
         console.log('📅 Loading active periods...')
@@ -204,12 +172,12 @@ export default {
         // 2. โหลดหัวข้อและตัวชี้วัด
         console.log('📋 Loading topics for period:', this.activePeriod.id)
         const topicsRes = await topicService.getTopicsByPeriod(
-          this.activePeriod.id, 
+          this.activePeriod.id,
           Date.now()
         )
-        
+
         console.log('📦 Topics response:', topicsRes)
-        
+
         // จัดการ response ให้ถูกต้อง
         if (topicsRes.data?.topics) {
           this.topics = topicsRes.data.topics
@@ -218,7 +186,7 @@ export default {
         } else {
           this.topics = []
         }
-        
+
         console.log('✅ Topics loaded:', this.topics.length)
 
         // 3. โหลดการประเมินของตัวเอง
@@ -233,7 +201,7 @@ export default {
         console.log('✅ Dashboard loaded successfully!')
         console.log('📊 Total criteria:', this.total)
         console.log('📊 Topics loaded:', this.topics.length)
-        
+
       } catch (err) {
         console.error('❌ Load data error:', err)
       } finally {
@@ -248,7 +216,7 @@ export default {
       }, 0)
 
       // นับจำนวน criteria ที่ทำเสร็จ
-      this.completed = this.evaluations.filter(e => 
+      this.completed = this.evaluations.filter(e =>
         e.status === 'submitted' || e.status === 'evaluated'
       ).length
 
@@ -270,7 +238,7 @@ export default {
       console.log('🎯 Opening evaluation form...')
       console.log('📋 Active period:', this.activePeriod)
       console.log('📋 Topics available:', this.topics.length)
-      
+
       // ⭐ เช็คเงื่อนไขก่อนเปิด Dialog
       if (!this.activePeriod) {
         alert('❌ ไม่พบรอบการประเมินที่เปิดอยู่')
@@ -299,16 +267,28 @@ export default {
     },
 
     async handleSubmitted() {
-      console.log('✅ Evaluation submitted!')
-      this.evaluationDialog = false
-      await this.loadData()
-    },
+  console.log('🎉 Evaluation submitted successfully!')
+  console.log('🔄 Closing dialog and reloading data...')
+  
+  this.evaluationDialog = false
+  
+  // รอ 1 วินาทีให้ Backend บันทึกเสร็จ
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  
+  // โหลดข้อมูลใหม่
+  await this.loadData()
+  
+  console.log('✅ Data reloaded. isSubmitted:', this.isSubmitted)
+},
 
     viewReport() {
+      console.log('🔍 Opening report. isSubmitted:', this.isSubmitted)
+
       if (!this.isSubmitted) {
-        alert('⚠️ กรุณาส่งการประเมินก่อน')
+        alert('⚠️ กรุณาส่งแบบประเมินก่อนดูรายงาน')
         return
       }
+
       this.reportDialog = true
     },
 

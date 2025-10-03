@@ -7,20 +7,22 @@ const { success, error, notFound, badRequest } = require('../utils/responseHelpe
 // ====== EVALUATEE CONTROLLERS ======
 
 // ดึงการประเมินของผู้ใช้ในรอบการประเมิน
+// ดึงการประเมินของผู้ใช้ในรอบการประเมิน
 const getMyEvaluations = async (req, res) => {
   try {
     const { periodId } = req.params;
     const userId = req.user.id;
     
+    console.log(`📊 Getting evaluations for user ${userId}, period ${periodId}`);
+    
     const evaluations = await Evaluation.getByUserAndPeriod(userId, periodId);
     const status = await Evaluation.getEvaluationStatus(userId, periodId);
     
-    return success(res, {
-      evaluations: evaluations,
-      status: status,
-      period_id: periodId,
-      user_id: userId
-    }, 'ดึงการประเมินสำเร็จ');
+    console.log(`✅ Found ${evaluations.length} evaluations`);
+    console.log(`✅ Status:`, status);
+    
+    // ⭐ แก้ตรงนี้ - return evaluations ตรงๆ ไม่ต้อง wrap
+    return success(res, evaluations, 'ดึงการประเมินสำเร็จ');
 
   } catch (err) {
     console.error('Get my evaluations error:', err);
