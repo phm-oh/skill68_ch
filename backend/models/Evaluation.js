@@ -1,12 +1,15 @@
-// backend/models/Evaluation.js
-// Model สำหรับจัดการการประเมิน (FIXED VERSION)
+// Path: backend/models/Evaluation.js
+// Model สำหรับจัดการการประเมิน (แก้ไขเพิ่ม options)
 
 const db = require('../config/database');
 
 class Evaluation {
-  // ดึงการประเมินของผู้ใช้ในรอบการประเมิน
+  // ✅ แก้ไข: ดึงการประเมินของผู้ใช้ในรอบการประเมิน (เพิ่ม options)
   static async getByUserAndPeriod(userId, periodId) {
     try {
+      console.log('🔍 Getting evaluations for user:', userId, 'period:', periodId);
+      
+      // ดึงการประเมินพื้นฐานก่อน
       const [rows] = await db.execute(`
         SELECT 
           ue.*,
@@ -14,6 +17,7 @@ class Evaluation {
           ec.weight_score,
           ec.evaluation_type,
           ec.evidence_required,
+          ec.topic_id,
           et.topic_name,
           et.weight_percentage as topic_weight,
           self_opt.option_text as self_option_text,
@@ -29,8 +33,31 @@ class Evaluation {
         ORDER BY et.sort_order ASC, ec.sort_order ASC
       `, [userId, periodId]);
 
+      console.log('✅ Found evaluations:', rows.length);
+
+      // ✅ เพิ่ม: ดึง options สำหรับแต่ละ criteria
+      for (let evaluation of rows) {
+        const [options] = await db.execute(`
+          SELECT 
+            id,
+            option_text,
+            option_value,
+            sort_order
+          FROM evaluation_options 
+          WHERE criteria_id = ? 
+          ORDER BY sort_order ASC, option_value ASC
+        `, [evaluation.criteria_id]);
+
+        evaluation.options = options;
+        
+        console.log(`📋 Criteria "${evaluation.criteria_name}": ${options.length} options`);
+      }
+
+      console.log('✅ All evaluations with options loaded');
+      
       return rows;
     } catch (error) {
+      console.error('❌ Error in getByUserAndPeriod:', error);
       throw new Error('เกิดข้อผิดพลาดในการดึงการประเมิน: ' + error.message);
     }
   }
@@ -64,20 +91,17 @@ class Evaluation {
         params.push(periodId);
       }
 
-      query += `
-        GROUP BY ue.user_id, ue.period_id, u.full_name, u.department, u.position, ep.period_name, ca.role
-        ORDER BY ep.start_date DESC, u.full_name ASC
-      `;
+      query += ' GROUP BY ue.user_id, ue.period_id, ca.role ORDER BY ep.id DESC, u.full_name ASC';
 
       const [rows] = await db.execute(query, params);
       return rows;
     } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการดึงรายการประเมินสำหรับกรรมการ: ' + error.message);
+      throw new Error('เกิดข้อผิดพลาดในการดึงการประเมินสำหรับกรรมการ: ' + error.message);
     }
   }
 
-  // สร้างการประเมินใหม่หรืออัปเดต (Self Assessment) - FIXED
-  static async createOrUpdateSelf(evaluationData) {
+  // บันทึกการประเมินตนเอง
+  static async saveSelf(data) {
     const {
       user_id,
       criteria_id,
@@ -88,84 +112,44 @@ class Evaluation {
       evidence_files,
       evidence_urls,
       evidence_text
-    } = evaluationData;
+    } = data;
 
     try {
-      // แปลง undefined เป็น null เพื่อป้องกัน SQL error
-      const safeComment = self_comment || null;
-      const safeEvidenceText = evidence_text || null;
-      const safeEvidenceFiles = evidence_files && evidence_files.length > 0
-        ? JSON.stringify(evidence_files)
-        : null;
-      const safeEvidenceUrls = evidence_urls && evidence_urls.length > 0
-        ? JSON.stringify(evidence_urls)
-        : null;
+      const [result] = await db.execute(`
+        INSERT INTO user_evaluations 
+        (user_id, criteria_id, period_id, self_selected_option_id, self_score, self_comment, 
+         evidence_files, evidence_urls, evidence_text, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+          self_selected_option_id = VALUES(self_selected_option_id),
+          self_score = VALUES(self_score),
+          self_comment = VALUES(self_comment),
+          evidence_files = VALUES(evidence_files),
+          evidence_urls = VALUES(evidence_urls),
+          evidence_text = VALUES(evidence_text),
+          updated_at = NOW()
+      `, [
+        user_id, criteria_id, period_id, self_selected_option_id, self_score,
+        self_comment || null,
+        evidence_files ? JSON.stringify(evidence_files) : null,
+        evidence_urls ? JSON.stringify(evidence_urls) : null,
+        evidence_text || null
+      ]);
 
-      // ตรวจสอบว่ามีการประเมินอยู่แล้วหรือไม่
-      const [existing] = await db.execute(
-        'SELECT id FROM user_evaluations WHERE user_id = ? AND criteria_id = ? AND period_id = ?',
-        [user_id, criteria_id, period_id]
-      );
-
-      if (existing.length > 0) {
-        // อัปเดต
-        const [result] = await db.execute(`
-          UPDATE user_evaluations 
-          SET self_selected_option_id = ?, self_score = ?, self_comment = ?, 
-              evidence_files = ?, evidence_urls = ?, evidence_text = ?, 
-              status = 'draft', updated_at = NOW()
-          WHERE id = ?
-        `, [
-          self_selected_option_id,
-          self_score,
-          safeComment,
-          safeEvidenceFiles,
-          safeEvidenceUrls,
-          safeEvidenceText,
-          existing[0].id
-        ]);
-
-        return existing[0].id;
-      } else {
-        // สร้างใหม่
-        const [result] = await db.execute(`
-          INSERT INTO user_evaluations 
-          (user_id, criteria_id, period_id, self_selected_option_id, self_score, self_comment, 
-           evidence_files, evidence_urls, evidence_text, status, created_at) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())
-        `, [
-          user_id,
-          criteria_id,
-          period_id,
-          self_selected_option_id,
-          self_score,
-          safeComment,
-          safeEvidenceFiles,
-          safeEvidenceUrls,
-          safeEvidenceText
-        ]);
-
-        return result.insertId;
-      }
+      return result.affectedRows > 0;
     } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการบันทึกการประเมิน: ' + error.message);
+      throw new Error('เกิดข้อผิดพลาดในการบันทึกการประเมินตนเอง: ' + error.message);
     }
   }
 
-  // ส่งการประเมิน (Submit) - FIXED
+  // ส่งการประเมิน
   static async submit(userId, periodId) {
     try {
-      // อัปเดตทุก record ที่เป็น draft หรือ null และมีคะแนน
       const [result] = await db.execute(`
         UPDATE user_evaluations 
         SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
-        WHERE user_id = ? 
-          AND period_id = ? 
-          AND (status = 'draft' OR status IS NULL)
-          AND self_score IS NOT NULL
+        WHERE user_id = ? AND period_id = ? AND status = 'draft'
       `, [userId, periodId]);
-
-      console.log(`✅ Updated ${result.affectedRows} evaluations to submitted`);
 
       return result.affectedRows;
     } catch (error) {
@@ -173,26 +157,32 @@ class Evaluation {
     }
   }
 
-  // การประเมินโดยกรรมการ
-  static async evaluateByCommittee(evaluationData) {
+  // ประเมินโดยกรรมการ
+  static async evaluateByCommittee(data) {
     const {
       evaluation_id,
       committee_selected_option_id,
       committee_score,
       committee_comment,
       committee_evaluated_by
-    } = evaluationData;
+    } = data;
 
     try {
       const [result] = await db.execute(`
         UPDATE user_evaluations 
-        SET committee_selected_option_id = ?, committee_score = ?, committee_comment = ?, 
-            committee_evaluated_by = ?, status = 'evaluated', evaluated_at = NOW(), updated_at = NOW()
-        WHERE id = ?
+        SET 
+          committee_selected_option_id = ?,
+          committee_score = ?,
+          committee_comment = ?,
+          committee_evaluated_by = ?,
+          status = 'evaluated',
+          evaluated_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ? AND status = 'submitted'
       `, [
         committee_selected_option_id,
         committee_score,
-        committee_comment,
+        committee_comment || null,
         committee_evaluated_by,
         evaluation_id
       ]);
@@ -207,6 +197,7 @@ class Evaluation {
   static async approve(evaluationIds, approvedBy) {
     try {
       const placeholders = evaluationIds.map(() => '?').join(',');
+      
       const [result] = await db.execute(`
         UPDATE user_evaluations 
         SET status = 'approved', updated_at = NOW()
@@ -219,83 +210,34 @@ class Evaluation {
     }
   }
 
-  // คำนวณคะแนนรวมของผู้ใช้ในรอบการประเมิน
+  // คำนวณคะแนนรวม
   static async calculateTotalScore(userId, periodId) {
     try {
       const [rows] = await db.execute(`
         SELECT 
-          et.id as topic_id,
           et.topic_name,
           et.weight_percentage,
-          SUM(ue.committee_score * ec.weight_score) as topic_total_score,
-          SUM(ec.weight_score) as topic_max_score
+          SUM(ue.committee_score * ec.weight_score * et.weight_percentage / 100) as topic_score
         FROM user_evaluations ue
         JOIN evaluation_criteria ec ON ue.criteria_id = ec.id
         JOIN evaluation_topics et ON ec.topic_id = et.id
         WHERE ue.user_id = ? AND ue.period_id = ? AND ue.status IN ('evaluated', 'approved')
-        GROUP BY et.id, et.topic_name, et.weight_percentage
+        GROUP BY et.id
         ORDER BY et.sort_order ASC
       `, [userId, periodId]);
 
-      let totalScore = 0;
-      let weightedScore = 0;
-
-      const topicScores = rows.map(row => {
-        const topicAverage = row.topic_max_score > 0 ? (row.topic_total_score / row.topic_max_score) : 0;
-        const weightedTopicScore = topicAverage * (row.weight_percentage / 100);
-
-        weightedScore += weightedTopicScore;
-
-        return {
-          topic_id: row.topic_id,
-          topic_name: row.topic_name,
-          weight_percentage: row.weight_percentage,
-          topic_score: topicAverage,
-          weighted_score: weightedTopicScore
-        };
-      });
+      const totalScore = rows.reduce((sum, topic) => sum + (topic.topic_score || 0), 0);
 
       return {
-        total_score: weightedScore,
-        max_score: 4.0,
-        percentage: (weightedScore / 4.0) * 100,
-        topic_scores: topicScores
+        total_score: totalScore,
+        topics: rows
       };
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการคำนวณคะแนน: ' + error.message);
     }
   }
 
-  // รายงานสรุปการประเมินของรอบ
-  static async getPeriodSummary(periodId) {
-    try {
-      const [summary] = await db.execute(`
-        SELECT 
-          COUNT(DISTINCT ue.user_id) as total_participants,
-          COUNT(CASE WHEN ue.status = 'draft' THEN 1 END) as draft_count,
-          COUNT(CASE WHEN ue.status = 'submitted' THEN 1 END) as submitted_count,
-          COUNT(CASE WHEN ue.status = 'evaluated' THEN 1 END) as evaluated_count,
-          COUNT(CASE WHEN ue.status = 'approved' THEN 1 END) as approved_count,
-          AVG(CASE WHEN ue.status IN ('evaluated', 'approved') AND ue.committee_score IS NOT NULL 
-              THEN ue.committee_score ELSE NULL END) as average_score
-        FROM user_evaluations ue
-        WHERE ue.period_id = ?
-      `, [periodId]);
-
-      return summary[0] || {
-        total_participants: 0,
-        draft_count: 0,
-        submitted_count: 0,
-        evaluated_count: 0,
-        approved_count: 0,
-        average_score: null
-      };
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการดึงสรุปการประเมิน: ' + error.message);
-    }
-  }
-
-  // ดึงรายละเอียดการประเมินตาม ID
+  // ดึงการประเมินตาม ID
   static async findById(id) {
     try {
       const [rows] = await db.execute(`
@@ -324,28 +266,25 @@ class Evaluation {
   }
 
   // ตรวจสอบสถานะการประเมิน
-  // ตรวจสอบสถานะการประเมิน
   static async getEvaluationStatus(userId, periodId) {
     try {
-      // นับจำนวน criteria ทั้งหมดในรอบนี้
       const [totalCriteria] = await db.execute(`
-      SELECT COUNT(*) as total
-      FROM evaluation_criteria ec
-      JOIN evaluation_topics et ON ec.topic_id = et.id
-      WHERE et.period_id = ?
-    `, [periodId]);
+        SELECT COUNT(*) as total
+        FROM evaluation_criteria ec
+        JOIN evaluation_topics et ON ec.topic_id = et.id
+        WHERE et.period_id = ?
+      `, [periodId]);
 
-      // นับสถานะการประเมินที่มีอยู่
       const [rows] = await db.execute(`
-      SELECT 
-        COUNT(*) as saved_criteria,
-        SUM(CASE WHEN ue.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
-        SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
-        SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count,
-        SUM(CASE WHEN ue.status = 'approved' THEN 1 ELSE 0 END) as approved_count
-      FROM user_evaluations ue
-      WHERE ue.user_id = ? AND ue.period_id = ?
-    `, [userId, periodId]);
+        SELECT 
+          COUNT(*) as saved_criteria,
+          SUM(CASE WHEN ue.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
+          SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
+          SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count,
+          SUM(CASE WHEN ue.status = 'approved' THEN 1 ELSE 0 END) as approved_count
+        FROM user_evaluations ue
+        WHERE ue.user_id = ? AND ue.period_id = ?
+      `, [userId, periodId]);
 
       const status = rows[0];
       const totalRequired = totalCriteria[0].total;
@@ -354,7 +293,6 @@ class Evaluation {
       const completionRate = totalRequired > 0 ?
         ((status.submitted_count + status.evaluated_count + status.approved_count) / totalRequired) * 100 : 0;
 
-      // สามารถส่งได้ต่อเมื่อ: บันทึกครบทุก criteria และมี draft อย่างน้อย 1 อัน
       const canSubmit = savedCount === totalRequired && totalRequired > 0 && status.draft_count > 0;
 
       return {
@@ -369,6 +307,28 @@ class Evaluation {
       };
     } catch (error) {
       throw new Error('เกิดข้อผิดพลาดในการตรวจสอบสถานะ: ' + error.message);
+    }
+  }
+
+  // สรุปรอบการประเมิน
+  static async getPeriodSummary(periodId) {
+    try {
+      const [rows] = await db.execute(`
+        SELECT 
+          COUNT(DISTINCT ue.user_id) as total_users,
+          COUNT(*) as total_evaluations,
+          SUM(CASE WHEN ue.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
+          SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
+          SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count,
+          SUM(CASE WHEN ue.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
+          AVG(ue.committee_score) as average_score
+        FROM user_evaluations ue
+        WHERE ue.period_id = ?
+      `, [periodId]);
+
+      return rows[0];
+    } catch (error) {
+      throw new Error('เกิดข้อผิดพลาดในการสรุปรอบการประเมิน: ' + error.message);
     }
   }
 }

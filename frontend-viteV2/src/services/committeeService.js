@@ -1,0 +1,95 @@
+// Path: frontend-viteV2/src/services/committeeService.js
+// Service สำหรับเรียก API ระบบกรรมการ
+
+import axios from 'axios'
+
+const API_BASE = 'http://localhost:3000/api'
+const getToken = () => localStorage.getItem('token')
+
+const committeeService = {
+  
+  // ดึงรายชื่อผู้ที่ต้องประเมิน
+  async getAssignments(periodId = null) {
+    try {
+      const url = periodId 
+        ? `${API_BASE}/committee/assignments?period_id=${periodId}`
+        : `${API_BASE}/committee/assignments`
+      
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      
+      return response.data
+    } catch (error) {
+      console.error('❌ Error loading assignments:', error)
+      throw new Error(error.response?.data?.message || 'ไม่สามารถโหลดรายการประเมินได้')
+    }
+  },
+
+  // ดูรายละเอียดการประเมินของคนอื่น
+  async getEvaluationDetail(userId, periodId) {
+    try {
+      const url = `${API_BASE}/evaluations/review/${userId}/${periodId}`
+      
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      
+      return response.data
+    } catch (error) {
+      console.error('❌ Error loading evaluation detail:', error)
+      throw new Error(error.response?.data?.message || 'ไม่สามารถโหลดรายละเอียดการประเมินได้')
+    }
+  },
+
+  // บันทึกคะแนนประเมิน (แก้แล้ว - ส่ง field name ตรงกับ Backend)
+  async saveEvaluation(evaluationId, data) {
+    try {
+      const url = `${API_BASE}/evaluations/committee/${evaluationId}`
+      
+      console.log('💾 Saving evaluation ID:', evaluationId)
+      
+      // ✅ ส่ง field name ตรงกับที่ Backend ต้องการ
+      const payload = {
+        committee_selected_option_id: data.selectedOptionId,
+        committee_score: data.score,
+        committee_comment: data.comment || ''
+      }
+      
+      console.log('📦 Payload:', payload)
+      
+      const response = await axios.post(url, payload, {
+        headers: { 
+          Authorization: `Bearer ${getToken()}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      console.log('✅ Saved successfully:', response.data)
+      
+      return response.data
+    } catch (error) {
+      console.error('❌ Error saving evaluation:', error)
+      console.error('❌ Response:', error.response?.data)
+      throw new Error(error.response?.data?.message || 'ไม่สามารถบันทึกการประเมินได้')
+    }
+  },
+
+  // ดึงข้อมูลรอบการประเมิน
+  async getPeriods() {
+    try {
+      const url = `${API_BASE}/periods`
+      
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      
+      return response.data
+    } catch (error) {
+      console.error('❌ Error loading periods:', error)
+      throw new Error(error.response?.data?.message || 'ไม่สามารถโหลดรอบการประเมินได้')
+    }
+  }
+}
+
+export default committeeService
