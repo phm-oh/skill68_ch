@@ -267,19 +267,19 @@ export default {
     },
 
     async handleSubmitted() {
-  console.log('🎉 Evaluation submitted successfully!')
-  console.log('🔄 Closing dialog and reloading data...')
-  
-  this.evaluationDialog = false
-  
-  // รอ 1 วินาทีให้ Backend บันทึกเสร็จ
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  
-  // โหลดข้อมูลใหม่
-  await this.loadData()
-  
-  console.log('✅ Data reloaded. isSubmitted:', this.isSubmitted)
-},
+      console.log('🎉 Evaluation submitted successfully!')
+      console.log('🔄 Closing dialog and reloading data...')
+
+      this.evaluationDialog = false
+
+      // รอ 1 วินาทีให้ Backend บันทึกเสร็จ
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // โหลดข้อมูลใหม่
+      await this.loadData()
+
+      console.log('✅ Data reloaded. isSubmitted:', this.isSubmitted)
+    },
 
     viewReport() {
       console.log('🔍 Opening report. isSubmitted:', this.isSubmitted)
