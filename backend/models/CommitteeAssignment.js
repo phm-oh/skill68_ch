@@ -16,39 +16,36 @@ class CommitteeAssignment {
           ca.role,
           ca.assigned_at,
           
-          --  เพิ่มข้อมูลผู้รับการประเมิน
+          -- ข้อมูลผู้รับการประเมิน
           u.full_name AS evaluatee_name,
-          u.email AS evaluatee_email,
           u.department AS evaluatee_department,
           u.position AS evaluatee_position,
+          u.email AS evaluatee_email,
           
-          --  เพิ่มข้อมูลรอบการประเมิน
+          -- ข้อมูลรอบการประเมิน
           ep.period_name,
           ep.start_date,
           ep.end_date,
-          ep.is_active,
+          ep.is_active AS period_active,
           
-          --  เพิ่มสถานะการส่งงาน
-          CASE 
-            WHEN COUNT(ue.id) = 0 THEN 'not_started'
-            WHEN SUM(CASE WHEN ue.status = 'submitted' OR ue.status = 'evaluated' THEN 1 ELSE 0 END) = 0 THEN 'draft'
-            WHEN SUM(CASE WHEN ue.status = 'submitted' OR ue.status = 'evaluated' THEN 1 ELSE 0 END) = COUNT(ue.id) THEN 'submitted'
-            ELSE 'partial'
-          END AS submission_status,
+          -- สถานะการส่งงาน
+          GROUP_CONCAT(DISTINCT ue.status) AS submission_statuses,
+          MAX(ue.submitted_at) AS last_submitted_at,
           
-          --  เพิ่มสถานะการประเมิน
+          -- สถานะการประเมิน
           COUNT(ue.id) AS total_criteria,
           SUM(CASE WHEN ue.committee_score IS NOT NULL THEN 1 ELSE 0 END) AS evaluated_count,
+          
           CASE 
-            WHEN COUNT(ue.id) = 0 THEN 'pending'
+            WHEN COUNT(ue.id) = 0 THEN 'no_data'
             WHEN SUM(CASE WHEN ue.committee_score IS NOT NULL THEN 1 ELSE 0 END) = COUNT(ue.id) THEN 'completed'
             WHEN SUM(CASE WHEN ue.committee_score IS NOT NULL THEN 1 ELSE 0 END) > 0 THEN 'in_progress'
             ELSE 'pending'
           END AS evaluation_status
           
         FROM committee_assignments ca
-        JOIN users u ON ca.evaluatee_id = u.id
-        JOIN evaluation_periods ep ON ca.period_id = ep.id
+        INNER JOIN users u ON ca.evaluatee_id = u.id
+        INNER JOIN evaluation_periods ep ON ca.period_id = ep.id
         LEFT JOIN user_evaluations ue ON ue.user_id = ca.evaluatee_id AND ue.period_id = ca.period_id
         WHERE ca.committee_id = ?
       `;
@@ -62,19 +59,24 @@ class CommitteeAssignment {
 
       query += `
         GROUP BY ca.id, ca.committee_id, ca.evaluatee_id, ca.period_id, ca.role, ca.assigned_at,
-                 u.full_name, u.email, u.department, u.position,
+                 u.full_name, u.department, u.position, u.email,
                  ep.period_name, ep.start_date, ep.end_date, ep.is_active
-        ORDER BY ca.assigned_at DESC, u.full_name ASC
+        ORDER BY 
+          CASE ca.role 
+            WHEN 'chairman' THEN 1 
+            ELSE 2 
+          END,
+          ca.assigned_at DESC
       `;
 
       const [rows] = await db.execute(query, params);
       
-      console.log(` getByCommittee: Found ${rows.length} assignments for committee ${committeeId}`);
+      console.log(`✅ Found ${rows.length} assignments for committee ${committeeId}`);
       
       return rows;
     } catch (error) {
-      console.error(' getByCommittee error:', error);
-      throw new Error('เกิดข้อผิดพลาดในการดึงข้อมูลการมอบหมาย: ' + error.message);
+      console.error('❌ getByCommittee error:', error);
+      throw new Error('เกิดข้อผิดพลาดในการดึงรายการมอบหมาย: ' + error.message);
     }
   }
 

@@ -20,12 +20,25 @@
       <v-card-text>
         <v-row>
           <v-col cols="12" md="6">
-            <v-select v-model="selectedPeriod" :items="periods" item-title="period_name" item-value="id"
-              label="🗓️ เลือกรอบการประเมิน" variant="outlined" density="comfortable"
-              @update:model-value="loadAssignments" />
+            <v-select
+              v-model="selectedPeriod"
+              :items="periods"
+              item-title="period_name"
+              item-value="id"
+              label="🗓️ เลือกรอบการประเมิน"
+              variant="outlined"
+              density="comfortable"
+              @update:model-value="loadAssignments"
+            />
           </v-col>
           <v-col cols="12" md="6">
-            <v-text-field v-model="search" label="🔍 ค้นหาชื่อ" variant="outlined" density="comfortable" clearable />
+            <v-text-field
+              v-model="search"
+              label="🔍 ค้นหาชื่อ"
+              variant="outlined"
+              density="comfortable"
+              clearable
+            />
           </v-col>
         </v-row>
       </v-card-text>
@@ -48,14 +61,24 @@
 
     <!-- Assignment List -->
     <v-row v-else>
-      <v-col v-for="assignment in filteredAssignments" :key="assignment.id" cols="12" md="6" lg="4">
+      <v-col
+        v-for="assignment in filteredAssignments"
+        :key="assignment.id"
+        cols="12"
+        md="6"
+        lg="4"
+      >
         <v-card hover class="h-100">
           <v-card-title class="d-flex justify-space-between align-center">
             <div>
               <v-icon color="primary">mdi-account</v-icon>
               {{ assignment.evaluatee_name }}
             </div>
-            <v-chip :color="getStatusColor(assignment.evaluation_status)" size="small" variant="flat">
+            <v-chip
+              :color="getStatusColor(assignment.evaluation_status)"
+              size="small"
+              variant="flat"
+            >
               {{ getStatusText(assignment.evaluation_status) }}
             </v-chip>
           </v-card-title>
@@ -76,7 +99,12 @@
           <v-divider />
 
           <v-card-actions>
-            <v-btn color="primary" block variant="flat" @click="openEvaluation(assignment)">
+            <v-btn
+              color="primary"
+              block
+              variant="flat"
+              @click="openEvaluation(assignment)"
+            >
               <v-icon left>mdi-pencil</v-icon>
               {{ assignment.evaluation_status === 'pending' ? 'เริ่มประเมิน' : 'ดูรายละเอียด' }}
             </v-btn>
@@ -87,8 +115,12 @@
 
     <!-- Evaluation Dialog -->
     <v-dialog v-model="evaluationDialog" max-width="1200px" persistent>
-      <CommitteeEvaluation v-if="selectedAssignment" :assignment="selectedAssignment" @close="closeEvaluation"
-        @saved="handleSaved" />
+      <CommitteeEvaluation
+        v-if="selectedAssignment"
+        :assignment="selectedAssignment"
+        @close="closeEvaluation"
+        @saved="handleSaved"
+      />
     </v-dialog>
   </v-container>
 </template>
@@ -118,7 +150,7 @@ export default {
     filteredAssignments() {
       if (!this.search) return this.assignments
 
-      return this.assignments.filter(a =>
+      return this.assignments.filter(a => 
         a.evaluatee_name.toLowerCase().includes(this.search.toLowerCase())
       )
     }
@@ -133,17 +165,17 @@ export default {
       try {
         console.log('📅 Loading periods...')
         const response = await committeeService.getPeriods()
-
+        
         console.log('📦 Periods response:', response)
-
+        
         // จัดการ response ที่มาในหลายรูปแบบ
         let periodsData = []
-
+        
         if (response.success && response.data) {
           // กรณีที่ 1: data.periods
           if (response.data.periods && Array.isArray(response.data.periods)) {
             periodsData = response.data.periods
-          }
+          } 
           // กรณีที่ 2: data เป็น array
           else if (Array.isArray(response.data)) {
             periodsData = response.data
@@ -153,15 +185,15 @@ export default {
         else if (Array.isArray(response)) {
           periodsData = response
         }
-
+        
         this.periods = periodsData
-
+        
         console.log('✅ Loaded periods:', this.periods.length)
-
+        
         // เลือกรอบที่ active อัตโนมัติ
         if (this.periods.length > 0) {
           const activePeriod = this.periods.find(p => p.is_active)
-
+          
           if (activePeriod) {
             this.selectedPeriod = activePeriod.id
             console.log('✅ Auto-selected active period:', activePeriod.period_name)
@@ -170,12 +202,12 @@ export default {
             this.selectedPeriod = this.periods[0].id
             console.log('✅ Auto-selected first period:', this.periods[0].period_name)
           }
-
+          
           await this.loadAssignments()
         } else {
           console.warn('⚠️ No periods found')
         }
-
+        
       } catch (error) {
         console.error('❌ Error loading periods:', error)
         alert('ไม่สามารถโหลดรอบการประเมินได้: ' + error.message)
@@ -185,29 +217,39 @@ export default {
     },
 
     async loadAssignments() {
+      if (!this.selectedPeriod) {
+        console.warn('⚠️ No period selected')
+        return
+      }
+
       this.loading = true
       try {
-        console.log('📅 Loading assignments for period:', this.selectedPeriod)
-
+        console.log('📋 Loading assignments for period:', this.selectedPeriod)
+        
         const response = await committeeService.getAssignments(this.selectedPeriod)
-
-        console.log('📦 Full response:', response)
-        console.log('📊 Response data:', response.data)
-
-        if (response.success && response.data) {
-          // Handle different response formats
-          const assignmentData = response.data.assignments || response.data
-
-          if (Array.isArray(assignmentData)) {
-            this.assignments = assignmentData
-            console.log(`✅ Loaded ${assignmentData.length} assignments`)
+        
+        console.log('📦 Assignments response:', response)
+        
+        if (response.success) {
+          // จัดการ response ที่มาในหลายรูปแบบ
+          if (Array.isArray(response.data)) {
+            this.assignments = response.data
+          } else if (response.data && Array.isArray(response.data.assignments)) {
+            this.assignments = response.data.assignments
           } else {
-            console.warn('⚠️ Assignments is not an array:', assignmentData)
             this.assignments = []
           }
+          
+          console.log('✅ Loaded assignments:', this.assignments.length)
+        } else {
+          console.warn('⚠️ Failed to load assignments:', response.message)
+          this.assignments = []
         }
+        
       } catch (error) {
-        console.error('❌ Load error:', error)
+        console.error('❌ Error loading assignments:', error)
+        alert('ไม่สามารถโหลดรายการประเมินได้: ' + error.message)
+        this.assignments = []
       } finally {
         this.loading = false
       }
@@ -227,7 +269,7 @@ export default {
     async handleSaved() {
       console.log('💾 Evaluation saved, reloading...')
       this.closeEvaluation()
-
+      
       // รอให้บันทึกเสร็จแล้วโหลดใหม่
       await new Promise(resolve => setTimeout(resolve, 500))
       await this.loadAssignments()

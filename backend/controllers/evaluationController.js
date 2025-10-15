@@ -2,6 +2,7 @@
 // Controller สำหรับจัดการการประเมิน
 
 const Evaluation = require('../models/Evaluation');
+const db = require('../config/database'); 
 const { success, error, notFound, badRequest } = require('../utils/responseHelper');
 
 // ====== EVALUATEE CONTROLLERS ======
@@ -143,22 +144,48 @@ const getAssignedEvaluations = async (req, res) => {
 };
 
 // ดึงการประเมินของผู้ใช้คนอื่น (สำหรับกรรมการ)
+// ดึงการประเมินของผู้ใช้คนอื่น (สำหรับกรรมการ)
 const getEvaluationForReview = async (req, res) => {
   try {
     const { userId, periodId } = req.params;
     
+    console.log('🔍 Getting evaluation for review - userId:', userId, 'periodId:', periodId);
+    
+    // 1. ดึงข้อมูลผู้รับการประเมิน
+    const [userRows] = await db.execute(
+      'SELECT id, full_name, email, department, position FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    const user_info = userRows[0];
+    console.log('✅ User info:', user_info);
+    
+    // 2. ดึงข้อมูลรอบการประเมิน
+    const [periodRows] = await db.execute(
+      'SELECT id, period_name, start_date, end_date, description FROM evaluation_periods WHERE id = ?',
+      [periodId]
+    );
+    
+    const period_info = periodRows[0];
+    console.log('✅ Period info:', period_info);
+    
+    // 3. ดึงการประเมินทั้งหมด (ใช้ function เดิม)
     const evaluations = await Evaluation.getByUserAndPeriod(userId, periodId);
+    console.log('✅ Evaluations count:', evaluations.length);
+    
+    // 4. คำนวณคะแนนรวม (ใช้ function เดิม)
     const scoreData = await Evaluation.calculateTotalScore(userId, periodId);
     
+    // ส่งกลับ
     return success(res, {
+      user_info: user_info,
+      period_info: period_info,
       evaluations: evaluations,
-      score_summary: scoreData,
-      user_id: userId,
-      period_id: periodId
+      score_summary: scoreData
     }, 'ดึงการประเมินสำหรับตรวจสอบสำเร็จ');
 
   } catch (err) {
-    console.error('Get evaluation for review error:', err);
+    console.error('❌ Get evaluation for review error:', err);
     return error(res, 'เกิดข้อผิดพลาดในการดึงการประเมินสำหรับตรวจสอบ');
   }
 };

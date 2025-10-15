@@ -1,4 +1,9 @@
-<!-- frontend-viteV2/src/views/hr/Dashboard.vue -->
+<!-- 
+  Path: frontend-viteV2/src/views/hr/Dashboard.vue
+  แก้ไฟล์เดิม - เพิ่ม Tab "ภาพรวม" และ Components
+  แทนที่ไฟล์เดิมทั้งหมด
+-->
+
 <template>
   <v-app>
     <!-- App Bar -->
@@ -33,11 +38,99 @@
     <!-- Main Content -->
     <v-main>
       <v-container fluid>
-        <!-- Dashboard Overview -->
-        <div v-if="currentTab === 'dashboard'">
-          <h1 class="mb-4">ภาพรวมระบบ HR</h1>
+        <!-- ✅ เพิ่มส่วนนี้ - Dashboard ภาพรวม (ใหม่!) -->
+        <div v-if="currentTab === 'overview'">
+          <h1 class="text-h4 mb-4">📊 ภาพรวมระบบ</h1>
           
-          <!-- Stats Cards -->
+          <!-- เลือกรอบการประเมิน -->
+          <v-row>
+            <v-col cols="12" md="4">
+              <v-select
+                v-model="selectedPeriod"
+                :items="periods"
+                item-title="period_name"
+                item-value="id"
+                label="เลือกรอบการประเมิน"
+                variant="outlined"
+                density="comfortable"
+                @update:model-value="loadDashboard"
+              />
+            </v-col>
+          </v-row>
+
+          <!-- Loading -->
+          <v-row v-if="loadingDashboard">
+            <v-col cols="12" class="text-center py-8">
+              <v-progress-circular indeterminate color="primary" size="64" />
+              <p class="mt-4 text-grey">กำลังโหลดข้อมูล...</p>
+            </v-col>
+          </v-row>
+
+          <!-- Dashboard Content -->
+          <template v-else-if="dashboardData">
+            <!-- สถิติ 4 การ์ด -->
+            <v-row>
+              <v-col cols="12" md="3" v-for="stat in summaryStats" :key="stat.title">
+                <v-card class="pa-4">
+                  <div class="d-flex align-center mb-2">
+                    <v-icon :color="stat.color" size="32" class="mr-2">{{ stat.icon }}</v-icon>
+                    <div class="flex-grow-1">
+                      <div class="text-caption text-grey">{{ stat.title }}</div>
+                      <div class="text-h5 font-weight-bold">{{ stat.value }}</div>
+                    </div>
+                  </div>
+                  <v-progress-linear
+                    v-if="stat.progress !== undefined"
+                    :model-value="stat.progress"
+                    :color="stat.color"
+                    height="8"
+                    rounded
+                    class="mt-2"
+                  />
+                </v-card>
+              </v-col>
+            </v-row>
+
+            <!-- Charts -->
+            <v-row class="mt-4">
+              <v-col cols="12" md="6">
+                <v-card class="pa-4" elevation="2">
+                  <h3 class="text-h6 mb-4"> คะแนนเฉลี่ยแต่ละหัวข้อ</h3>
+                  <TopicScoresChart :data="chartData.topics" />
+                </v-card>
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-card class="pa-4" elevation="2">
+                  <h3 class="text-h6 mb-4">📊 การกระจายคะแนน</h3>
+                  <ScoreDistributionChart :data="chartData.distribution" />
+                </v-card>
+              </v-col>
+            </v-row>
+
+            <!-- ตารางแผนก -->
+            <v-row class="mt-4" v-if="dashboardData.department_summary">
+              <v-col cols="12">
+                <v-card class="pa-4" elevation="2">
+                  <h3 class="text-h6 mb-4">🏢 สถิติแต่ละแผนก</h3>
+                  <DepartmentTable :data="dashboardData.department_summary" />
+                </v-card>
+              </v-col>
+            </v-row>
+          </template>
+
+          <!-- No Data -->
+          <v-row v-else>
+            <v-col cols="12" class="text-center py-8">
+              <v-icon size="64" color="grey-lighten-1">mdi-chart-box-outline</v-icon>
+              <p class="mt-4 text-grey">ไม่มีข้อมูลในรอบนี้</p>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- Dashboard Quick Stats (เดิม) -->
+        <div v-if="currentTab === 'dashboard'">
+          <h1 class="mb-4">สถิติรวดเร็ว</h1>
           <v-row class="mb-6">
             <v-col cols="6" md="3">
               <v-card color="blue-lighten-4" class="text-center pa-4">
@@ -46,7 +139,6 @@
                 <p>รอบการประเมิน</p>
               </v-card>
             </v-col>
-            
             <v-col cols="6" md="3">
               <v-card color="green-lighten-4" class="text-center pa-4">
                 <v-icon size="40" color="green">mdi-account-group</v-icon>
@@ -54,59 +146,7 @@
                 <p>ผู้ใช้ทั้งหมด</p>
               </v-card>
             </v-col>
-
-            <v-col cols="6" md="3">
-              <v-card color="orange-lighten-4" class="text-center pa-4">
-                <v-icon size="40" color="orange">mdi-clipboard-check</v-icon>
-                <h2 class="mt-2">{{ stats.activePeriods }}</h2>
-                <p>รอบที่เปิดอยู่</p>
-              </v-card>
-            </v-col>
-
-            <v-col cols="6" md="3">
-              <v-card color="purple-lighten-4" class="text-center pa-4">
-                <v-icon size="40" color="purple">mdi-format-list-bulleted</v-icon>
-                <h2 class="mt-2">{{ stats.totalTopics }}</h2>
-                <p>หัวข้อประเมิน</p>
-              </v-card>
-            </v-col>
           </v-row>
-
-          <!-- Quick Actions -->
-          <v-card class="mb-4">
-            <v-card-title>
-              <v-icon class="mr-2">mdi-lightning-bolt</v-icon>
-              การดำเนินการด่วน
-            </v-card-title>
-            <v-card-text>
-              <v-row>
-                <v-col cols="12" md="6" lg="3">
-                  <v-btn block color="primary" @click="currentTab = 'periods'">
-                    <v-icon left>mdi-calendar-plus</v-icon>
-                    เพิ่มรอบประเมิน
-                  </v-btn>
-                </v-col>
-                <v-col cols="12" md="6" lg="3">
-                  <v-btn block color="success" @click="currentTab = 'users'">
-                    <v-icon left>mdi-account-plus</v-icon>
-                    เพิ่มผู้ใช้
-                  </v-btn>
-                </v-col>
-                <v-col cols="12" md="6" lg="3">
-                  <v-btn block color="info" @click="currentTab = 'topics'">
-                    <v-icon left>mdi-format-list-bulleted</v-icon>
-                    จัดการตัวชี้วัด
-                  </v-btn>
-                </v-col>
-                <v-col cols="12" md="6" lg="3">
-                  <v-btn block color="warning" @click="currentTab = 'committee'">
-                    <v-icon left>mdi-account-tie</v-icon>
-                    มอบหมายกรรมการ
-                  </v-btn>
-                </v-col>
-              </v-row>
-            </v-card-text>
-          </v-card>
         </div>
 
         <!-- Period Management -->
@@ -154,8 +194,14 @@ import PeriodManagement from '../../components/hr/PeriodManagement.vue'
 import TopicManagement from '../../components/hr/TopicManagement.vue'
 import UserManagement from '../../components/hr/UserManagement.vue'
 import CommitteeAssignment from '../../components/hr/CommitteeAssignment.vue'
+// ✅ เพิ่ม imports ใหม่
+import TopicScoresChart from '@/components/hr/charts/TopicScoresChart.vue'
+import ScoreDistributionChart from '@/components/hr/charts/ScoreDistributionChart.vue'
+import DepartmentTable from '@/components/hr/DepartmentTable.vue'
 import periodService from '../../services/periodService.js'
 import userService from '../../services/userService.js'
+import reportService from '../../services/reportService.js'
+
 
 export default {
   name: 'HRDashboard',
@@ -163,62 +209,135 @@ export default {
     PeriodManagement,
     TopicManagement,
     UserManagement,
-    CommitteeAssignment
+    CommitteeAssignment,
+    // ✅ เพิ่ม components ใหม่
+    TopicScoresChart,
+    ScoreDistributionChart,
+    DepartmentTable
   },
   data() {
     return {
-      currentTab: 'dashboard',
+      currentTab: 'overview', // ✅ เริ่มต้นที่ overview
+      menuItems: [
+        // ✅ เพิ่ม menu item ใหม่
+        { title: 'ภาพรวม', icon: 'mdi-view-dashboard', value: 'overview' },
+        { title: 'สถิติรวดเร็ว', icon: 'mdi-speedometer', value: 'dashboard' },
+        { title: 'จัดการรอบการประเมิน', icon: 'mdi-calendar', value: 'periods' },
+        { title: 'จัดการผู้ใช้', icon: 'mdi-account-group', value: 'users' },
+        { title: 'จัดการหัวข้อ', icon: 'mdi-text-box-multiple', value: 'topics' },
+        { title: 'มอบหมายกรรมการ', icon: 'mdi-account-star', value: 'committee' },
+        { title: 'รายงาน', icon: 'mdi-chart-bar', value: 'reports' }
+      ],
       stats: {
         totalPeriods: 0,
         totalUsers: 0,
         activePeriods: 0,
-        totalTopics: 0
+        totalCommittees: 0
       },
-      menuItems: [
-        { title: 'ภาพรวม', value: 'dashboard', icon: 'mdi-view-dashboard' },
-        { title: 'จัดการรอบประเมิน', value: 'periods', icon: 'mdi-calendar' },
-        { title: 'จัดการผู้ใช้', value: 'users', icon: 'mdi-account-group' },
-        { title: 'หัวข้อ & ตัวชี้วัด', value: 'topics', icon: 'mdi-format-list-bulleted' },
-        { title: 'มอบหมายกรรมการ', value: 'committee', icon: 'mdi-account-tie' },
-        { title: 'รายงาน', value: 'reports', icon: 'mdi-chart-bar' }
-      ]
+      // ✅ เพิ่ม data สำหรับ dashboard ใหม่
+      periods: [],
+      selectedPeriod: null,
+      loadingDashboard: false,
+      dashboardData: null
     }
   },
   computed: {
     user() {
-      const authStore = useAuthStore()
-      return authStore.user
+      return useAuthStore().user
+    },
+    // ✅ เพิ่ม computed properties
+    summaryStats() {
+      if (!this.dashboardData || !this.dashboardData.statistics) return []
+      
+      const stats = this.dashboardData.statistics
+      return [
+        {
+          title: 'ผู้ใช้ทั้งหมด',
+          value: stats.total_users || 0,
+          icon: 'mdi-account-group',
+          color: 'blue'
+        },
+        {
+          title: 'ส่งการประเมินแล้ว',
+          value: stats.submitted_users || 0,
+          progress: parseFloat(stats.completion_rate) || 0,
+          icon: 'mdi-file-check',
+          color: 'green'
+        },
+        {
+          title: 'ประเมินแล้ว',
+          value: stats.evaluated_users || 0,
+          progress: parseFloat(stats.evaluation_rate) || 0,
+          icon: 'mdi-star-check',
+          color: 'orange'
+        },
+        {
+          title: 'คะแนนเฉลี่ย',
+          value: stats.average_score ? stats.average_score.toFixed(2) : '-',
+          icon: 'mdi-chart-line',
+          color: 'purple'
+        }
+      ]
+    },
+    chartData() {
+      if (!this.dashboardData) {
+        return { topics: [], distribution: [] }
+      }
+      return {
+        topics: this.dashboardData.topic_analysis || [],
+        distribution: this.dashboardData.score_distribution || []
+      }
     }
   },
-  mounted() {
-    this.loadDashboardStats()
+  async mounted() {
+    await this.loadStats()
+    await this.loadPeriods()
   },
   methods: {
-    async loadDashboardStats() {
+    async loadStats() {
       try {
-        // Load periods data
-        const periodsResponse = await periodService.getPeriods()
-        const periods = periodsResponse.data || []
-        
-        this.stats.totalPeriods = periods.length
-        this.stats.activePeriods = periods.filter(p => p.is_active).length
-        
-        // Load users data
-        const usersResponse = await userService.getUsers()
-        const users = usersResponse.data?.users || usersResponse.data || []
-        this.stats.totalUsers = users.length
-        
-        // TODO: Load topics stats when API is ready
-        this.stats.totalTopics = 0
-        
+        const [periodsRes, usersRes] = await Promise.all([
+          periodService.getPeriods(),
+          userService.getUsers()
+        ])
+        this.stats.totalPeriods = periodsRes.data?.length || 0
+        this.stats.totalUsers = usersRes.data?.length || 0
       } catch (error) {
-        console.error('Error loading dashboard stats:', error)
+        console.error('Error loading stats:', error)
       }
     },
-
+    // ✅ เพิ่ม methods ใหม่
+    async loadPeriods() {
+      try {
+        const response = await periodService.getPeriods()
+        this.periods = response.data || []
+        
+        if (this.periods.length > 0) {
+          const activePeriod = this.periods.find(p => p.is_active)
+          this.selectedPeriod = activePeriod?.id || this.periods[0].id
+          await this.loadDashboard()
+        }
+      } catch (error) {
+        console.error('Load periods error:', error)
+      }
+    },
+    async loadDashboard() {
+      if (!this.selectedPeriod) return
+      
+      this.loadingDashboard = true
+      try {
+        // ใช้ API ที่มีอยู่แล้ว
+        const response = await reportService.getPeriodSummary(this.selectedPeriod)
+        this.dashboardData = response.data
+      } catch (error) {
+        console.error('Load dashboard error:', error)
+        this.dashboardData = null
+      } finally {
+        this.loadingDashboard = false
+      }
+    },
     logout() {
-      const authStore = useAuthStore()
-      authStore.logout()
+      useAuthStore().logout()
       this.$router.push('/login')
     }
   }
@@ -227,7 +346,6 @@ export default {
 
 <style scoped>
 .v-list-item--active {
-  background-color: rgba(25, 118, 210, 0.1);
-  color: #1976d2;
+  background-color: rgba(25, 118, 210, 0.12);
 }
 </style>
