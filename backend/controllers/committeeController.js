@@ -11,7 +11,7 @@ const getMyAssignments = async (req, res) => {
     const currentUserId = req.user.id;
     const userRole = req.user.role;
 
-    // 🔥 ตรวจสอบว่าเป็น HR ที่ต้องการดูข้อมูลทั้งหมด หรือกรรมการที่ดูแค่ตัวเอง
+    //  ตรวจสอบว่าเป็น HR ที่ต้องการดูข้อมูลทั้งหมด หรือกรรมการที่ดูแค่ตัวเอง
     if (userRole === 'hr' && (req.isHRWithPeriod || req.periodFilter)) {
       // HR ดูการมอบหมายทั้งหมดในรอบที่กำหนด
       console.log('HR requesting all assignments for period:', req.periodFilter || periodId);
