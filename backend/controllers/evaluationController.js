@@ -47,8 +47,8 @@ const saveSelfEvaluation = async (req, res) => {
     const userId = req.user.id;
 
     // ตรวจสอบว่าคะแนนอยู่ในช่วงที่ถูกต้อง
-    if (self_score && (self_score < 0 || self_score > 4)) {
-      return badRequest(res, 'คะแนนต้องอยู่ในช่วง 0-4');
+    if (self_score && (self_score < 0 || self_score > 400)) {
+      return badRequest(res, 'คะแนนต้องอยู่ในช่วง 0-400');
     }
 
     const evaluationId = await Evaluation.createOrUpdateSelf({
@@ -176,8 +176,8 @@ const evaluateByCommittee = async (req, res) => {
     const committeeId = req.user.id;
 
     // ตรวจสอบว่าคะแนนอยู่ในช่วงที่ถูกต้อง
-    if (committee_score && (committee_score < 0 || committee_score > 4)) {
-      return badRequest(res, 'คะแนนต้องอยู่ในช่วง 0-4');
+    if (committee_score && (committee_score < 0 || committee_score > 400)) {
+      return badRequest(res, 'คะแนนต้องอยู่ในช่วง 0-400');
     }
 
     const updated = await Evaluation.evaluateByCommittee({

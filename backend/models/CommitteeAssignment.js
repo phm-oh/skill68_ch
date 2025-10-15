@@ -9,34 +9,72 @@ class CommitteeAssignment {
     try {
       let query = `
         SELECT 
-          ca.*,
-          evaluatee.full_name as evaluatee_name,
-          evaluatee.department as evaluatee_department,
-          evaluatee.position as evaluatee_position,
+          ca.id AS assignment_id,
+          ca.committee_id,
+          ca.evaluatee_id,
+          ca.period_id,
+          ca.role,
+          ca.assigned_at,
+          
+          --  เพิ่มข้อมูลผู้รับการประเมิน
+          u.full_name AS evaluatee_name,
+          u.email AS evaluatee_email,
+          u.department AS evaluatee_department,
+          u.position AS evaluatee_position,
+          
+          --  เพิ่มข้อมูลรอบการประเมิน
           ep.period_name,
-          COUNT(ue.id) as total_criteria,
-          SUM(CASE WHEN ue.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
-          SUM(CASE WHEN ue.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count
+          ep.start_date,
+          ep.end_date,
+          ep.is_active,
+          
+          --  เพิ่มสถานะการส่งงาน
+          CASE 
+            WHEN COUNT(ue.id) = 0 THEN 'not_started'
+            WHEN SUM(CASE WHEN ue.status = 'submitted' OR ue.status = 'evaluated' THEN 1 ELSE 0 END) = 0 THEN 'draft'
+            WHEN SUM(CASE WHEN ue.status = 'submitted' OR ue.status = 'evaluated' THEN 1 ELSE 0 END) = COUNT(ue.id) THEN 'submitted'
+            ELSE 'partial'
+          END AS submission_status,
+          
+          --  เพิ่มสถานะการประเมิน
+          COUNT(ue.id) AS total_criteria,
+          SUM(CASE WHEN ue.committee_score IS NOT NULL THEN 1 ELSE 0 END) AS evaluated_count,
+          CASE 
+            WHEN COUNT(ue.id) = 0 THEN 'pending'
+            WHEN SUM(CASE WHEN ue.committee_score IS NOT NULL THEN 1 ELSE 0 END) = COUNT(ue.id) THEN 'completed'
+            WHEN SUM(CASE WHEN ue.committee_score IS NOT NULL THEN 1 ELSE 0 END) > 0 THEN 'in_progress'
+            ELSE 'pending'
+          END AS evaluation_status
+          
         FROM committee_assignments ca
-        JOIN users evaluatee ON ca.evaluatee_id = evaluatee.id
+        JOIN users u ON ca.evaluatee_id = u.id
         JOIN evaluation_periods ep ON ca.period_id = ep.id
-        LEFT JOIN user_evaluations ue ON ca.evaluatee_id = ue.user_id AND ca.period_id = ue.period_id
+        LEFT JOIN user_evaluations ue ON ue.user_id = ca.evaluatee_id AND ue.period_id = ca.period_id
         WHERE ca.committee_id = ?
       `;
-      
-      let params = [committeeId];
-      
+
+      const params = [committeeId];
+
       if (periodId) {
         query += ' AND ca.period_id = ?';
         params.push(periodId);
       }
-      
-      query += ' GROUP BY ca.id ORDER BY ca.role DESC, evaluatee.full_name ASC';
-      
+
+      query += `
+        GROUP BY ca.id, ca.committee_id, ca.evaluatee_id, ca.period_id, ca.role, ca.assigned_at,
+                 u.full_name, u.email, u.department, u.position,
+                 ep.period_name, ep.start_date, ep.end_date, ep.is_active
+        ORDER BY ca.assigned_at DESC, u.full_name ASC
+      `;
+
       const [rows] = await db.execute(query, params);
+      
+      console.log(` getByCommittee: Found ${rows.length} assignments for committee ${committeeId}`);
+      
       return rows;
     } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการดึงรายการมอบหมาย: ' + error.message);
+      console.error(' getByCommittee error:', error);
+      throw new Error('เกิดข้อผิดพลาดในการดึงข้อมูลการมอบหมาย: ' + error.message);
     }
   }
 

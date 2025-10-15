@@ -1,5 +1,5 @@
-<!-- Path: frontend-viteV2/src/components/committee/CommitteeEvaluation.vue -->
-<!-- แก้ไขแล้ว: ลิงค์คลิกได้ + บันทึกได้ -->
+<!-- frontend-viteV2/src/components/committee/CommitteeEvaluation.vue -->
+<!-- แก้ไขแล้ว: แก้ปัญหาการบันทึกคะแนน -->
 
 <template>
   <v-card>
@@ -30,134 +30,86 @@
         </v-alert>
 
         <!-- Evaluations by Topic -->
-        <div
-          v-for="topic in groupedEvaluations"
-          :key="topic.topic_id"
-          class="mb-6"
-        >
+        <div v-for="topic in groupedEvaluations" :key="topic.topic_id" class="mb-6">
           <v-card variant="outlined">
             <v-card-title class="bg-grey-lighten-4">
               📌 {{ topic.topic_name }}
             </v-card-title>
 
             <v-card-text>
-              <div
-                v-for="(criteria, index) in topic.criteria"
-                :key="criteria.id"
-                class="mb-6"
-              >
+              <div v-for="(criteria, index) in topic.criteria" :key="criteria.id" class="mb-6">
                 <v-divider v-if="index > 0" class="mb-4" />
 
                 <!-- Criteria Name -->
                 <h3 class="text-subtitle-1 font-weight-bold mb-3">
                   {{ index + 1 }}. {{ criteria.criteria_name }}
+                  <v-chip size="small" color="info" class="ml-2">
+                    น้ำหนัก {{ criteria.weight_score }}
+                  </v-chip>
                 </h3>
 
-                <!-- Self Evaluation -->
-                <v-card variant="tonal" color="blue-lighten-5" class="mb-3">
+                <!-- Self Evaluation Display -->
+                <v-card variant="tonal" color="blue-grey-lighten-5" class="mb-3">
                   <v-card-text>
-                    <div class="text-caption text-grey-darken-1 mb-2">
-                      📝 การประเมินตนเอง
+                    <div class="text-caption text-grey-darken-1 mb-1">การประเมินตนเอง:</div>
+                    <div class="font-weight-medium">
+                      คะแนน: {{ criteria.self_score || '-' }} | 
+                      ตัวเลือก: {{ criteria.self_option_text || '-' }}
                     </div>
-                    <div class="d-flex align-center mb-2">
-                      <v-chip color="blue" size="small" class="mr-2">
-                        คะแนน: {{ criteria.self_score || '-' }}
-                      </v-chip>
-                      <span>{{ criteria.self_comment || 'ไม่มีความเห็น' }}</span>
-                    </div>
-
-                    <!-- Evidence -->
-                    <div v-if="hasEvidence(criteria)" class="mt-3">
-                      <div class="text-caption text-grey-darken-1 mb-2">
-                        📎 หลักฐาน:
-                      </div>
-
-                      <!-- แสดงรูปภาพ -->
-                      <div class="d-flex flex-wrap gap-2 mb-3">
-                        <v-card
-                          v-for="(file, idx) in criteria.evidence_files"
-                          :key="idx"
-                          class="evidence-card"
-                          variant="outlined"
-                          @click="openImageDialog(file)"
-                        >
-                          <v-img
-                            v-if="isImage(file)"
-                            :src="getFileUrl(file)"
-                            :alt="file"
-                            height="120"
-                            width="120"
-                            cover
-                            class="cursor-pointer"
-                          >
-                            <template #placeholder>
-                              <div class="d-flex align-center justify-center fill-height">
-                                <v-progress-circular indeterminate color="primary" />
-                              </div>
-                            </template>
-                            <template #error>
-                              <div class="d-flex align-center justify-center fill-height bg-grey-lighten-3">
-                                <v-icon size="48" color="error">mdi-image-broken</v-icon>
-                              </div>
-                            </template>
-                          </v-img>
-                          
-                          <!-- PDF Icon -->
-                          <div v-else class="d-flex flex-column align-center justify-center pa-3" style="height: 120px; width: 120px;">
-                            <v-icon size="48" color="error">mdi-file-pdf-box</v-icon>
-                            <span class="text-caption mt-2 text-center">PDF</span>
-                          </div>
-                          
-                          <v-card-actions class="pa-1">
-                            <v-btn
-                              size="x-small"
-                              variant="text"
-                              color="primary"
-                              @click.stop="downloadFile(file)"
-                            >
-                              <v-icon size="small">mdi-download</v-icon>
-                            </v-btn>
-                          </v-card-actions>
-                        </v-card>
-                      </div>
-
-                      <!-- URLs - แก้แล้ว ใช้ <a> tag -->
-                      <div v-if="criteria.evidence_urls?.length > 0" class="mb-2">
-                        <a
-                          v-for="(url, idx) in criteria.evidence_urls"
-                          :key="idx"
-                          :href="url.startsWith('http') ? url : 'https://' + url"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-decoration-none"
-                        >
-                          <v-chip
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                            class="mr-2 mb-2 cursor-pointer"
-                          >
-                            <v-icon left size="small">mdi-link</v-icon>
-                            ลิงค์ {{ idx + 1 }}
-                          </v-chip>
-                        </a>
-                      </div>
-
-                      <!-- Text Evidence -->
-                      <div v-if="criteria.evidence_text" class="text-caption">
-                        <strong>คำอธิบาย:</strong> {{ criteria.evidence_text }}
-                      </div>
+                    <div v-if="criteria.self_comment" class="text-caption mt-2">
+                      💬 {{ criteria.self_comment }}
                     </div>
                   </v-card-text>
                 </v-card>
 
-                <!-- Committee Evaluation -->
-                <v-card variant="outlined" class="pa-4">
-                  <div class="text-caption text-grey-darken-1 mb-3">
-                    ✅ การประเมินของคุณ
+                <!-- Evidence Display -->
+                <div v-if="hasEvidence(criteria)" class="mb-3">
+                  <div class="text-caption text-grey-darken-1 mb-2">หลักฐานประกอบ:</div>
+                  
+                  <!-- Files -->
+                  <div v-if="criteria.evidence_files?.length" class="d-flex flex-wrap gap-2 mb-2">
+                    <v-chip
+                      v-for="file in criteria.evidence_files"
+                      :key="file"
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      @click="downloadFile(file)"
+                      class="cursor-pointer"
+                    >
+                      <v-icon start size="small">mdi-file-document</v-icon>
+                      {{ file }}
+                    </v-chip>
                   </div>
 
-                  <!-- Score Selection -->
+                  <!-- URLs -->
+                  <div v-if="criteria.evidence_urls?.length" class="d-flex flex-wrap gap-2 mb-2">
+                    <v-chip
+                      v-for="url in criteria.evidence_urls"
+                      :key="url"
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      :href="url"
+                      target="_blank"
+                      class="text-decoration-none"
+                    >
+                      <v-icon start size="small">mdi-link</v-icon>
+                      {{ url }}
+                    </v-chip>
+                  </div>
+
+                  <!-- Text -->
+                  <div v-if="criteria.evidence_text" class="text-caption">
+                    📝 {{ criteria.evidence_text }}
+                  </div>
+                </div>
+
+                <!-- Committee Evaluation Form -->
+                <v-card variant="outlined" color="success" class="pa-3">
+                  <div class="text-subtitle-2 text-success mb-2">การประเมินของกรรมการ:</div>
+                  
+                  <!-- Option Selection -->
                   <v-select
                     v-model="criteria.committee_selected_option_id"
                     :items="criteria.options"
@@ -165,27 +117,24 @@
                     item-value="id"
                     label="เลือกคะแนน"
                     variant="outlined"
-                    density="comfortable"
-                    class="mb-3"
+                    density="compact"
                     @update:model-value="updateScore(criteria)"
                   >
-                    <template #item="{ props, item }">
+                    <template #selection="{ item }">
+                      {{ item.raw.option_text }} ({{ item.raw.option_value }})
+                    </template>
+                    <template #item="{ item, props }">
                       <v-list-item v-bind="props">
-                        <template #append>
-                          <v-chip size="small" color="primary">
-                            {{ item.raw.option_value }}
-                          </v-chip>
-                        </template>
+                        <v-list-item-title>
+                          {{ item.raw.option_text }}
+                          <span class="text-grey ml-2">({{ item.raw.option_value }})</span>
+                        </v-list-item-title>
                       </v-list-item>
                     </template>
                   </v-select>
 
                   <!-- Score Display -->
-                  <v-chip
-                    v-if="criteria.committee_score"
-                    color="success"
-                    class="mb-3"
-                  >
+                  <v-chip v-if="criteria.committee_score" color="success" class="mb-3">
                     คะแนนที่ได้: {{ criteria.committee_score }}
                   </v-chip>
 
@@ -316,9 +265,17 @@ export default {
           })
           
           console.log('✅ Loaded evaluation data:', this.evaluationData)
+          
+          // 🔍 Debug: ดู structure ของข้อมูล
+          if (this.evaluationData.evaluations.length > 0) {
+            const sample = this.evaluationData.evaluations[0]
+            console.log('📦 Available fields:', Object.keys(sample))
+            console.log('📦 Sample evaluation:', sample)
+          }
         }
       } catch (error) {
         console.error('❌ Error loading evaluation:', error)
+        alert('ไม่สามารถโหลดข้อมูลการประเมินได้')
       } finally {
         this.loading = false
       }
@@ -330,11 +287,13 @@ export default {
       )
       
       if (selectedOption) {
+        // คำนวณคะแนน = option_value × weight_score
         criteria.committee_score = selectedOption.option_value * criteria.weight_score
       }
       
       console.log('📊 Updated score:', {
-        criteria_id: criteria.id,
+        criteria_id: criteria.criteria_id,
+        evaluation_id: criteria.id,
         option_id: criteria.committee_selected_option_id,
         score: criteria.committee_score
       })
@@ -352,36 +311,62 @@ export default {
         )
         
         if (evaluationsToSave.length === 0) {
-          alert('กรุณาเลือกคะแนนอย่างน้อย 1 รายการ')
+          alert('⚠️ กรุณาเลือกคะแนนอย่างน้อย 1 รายการ')
           this.saving = false
           return
         }
         
         console.log(`📝 Saving ${evaluationsToSave.length} evaluations...`)
         
-        const promises = evaluationsToSave.map(criteria => {
-          const payload = {
-            selectedOptionId: criteria.committee_selected_option_id,
-            score: criteria.committee_score,
-            comment: criteria.committee_comment || ''
+        // บันทึกทีละรายการแทน Promise.all (เพื่อดู error ละเอียด)
+        let successCount = 0
+        const errors = []
+        
+        for (const criteria of evaluationsToSave) {
+          try {
+            // 🔥 ใช้ criteria.id เป็น evaluation_id (จาก table user_evaluations)
+            const evaluationId = criteria.id
+            
+            if (!evaluationId) {
+              throw new Error(`ไม่พบ evaluation_id สำหรับตัวชี้วัด: ${criteria.criteria_name}`)
+            }
+            
+            const payload = {
+              selectedOptionId: criteria.committee_selected_option_id,
+              score: criteria.committee_score,
+              comment: criteria.committee_comment || ''
+            }
+            
+            console.log(`📤 Saving "${criteria.criteria_name}":`, {
+              evaluationId,
+              payload
+            })
+            
+            await committeeService.saveEvaluation(evaluationId, payload)
+            successCount++
+            console.log(`✅ Saved ${successCount}/${evaluationsToSave.length}`)
+            
+          } catch (error) {
+            console.error(`❌ Error saving "${criteria.criteria_name}":`, error)
+            errors.push({
+              criteria: criteria.criteria_name,
+              error: error.message
+            })
           }
-          
-          console.log(`📤 Saving evaluation ${criteria.id}:`, payload)
-          
-          return committeeService.saveEvaluation(criteria.id, payload)
-        })
-
-        const results = await Promise.all(promises)
+        }
         
-        console.log('✅ All evaluations saved:', results)
-        
-        alert('บันทึกการประเมินสำเร็จ')
-        this.$emit('saved')
+        if (errors.length > 0) {
+          console.error('❌ Save errors:', errors)
+          alert(`⚠️ บันทึกสำเร็จ ${successCount}/${evaluationsToSave.length} รายการ\n\nรายการที่ล้มเหลว:\n${errors.map(e => `- ${e.criteria}: ${e.error}`).join('\n')}`)
+        } else {
+          console.log(`✅ All ${successCount} evaluations saved successfully`)
+          alert(`✅ บันทึกการประเมินสำเร็จทั้งหมด (${successCount} รายการ)`)
+          this.$emit('saved')
+        }
         
       } catch (error) {
-        console.error('❌ Error saving evaluations:', error)
-        console.error('Error details:', error.response?.data)
-        alert('เกิดข้อผิดพลาดในการบันทึก: ' + (error.response?.data?.message || error.message))
+        console.error('❌ Fatal error:', error)
+        alert(`❌ เกิดข้อผิดพลาด: ${error.message}`)
       } finally {
         this.saving = false
       }

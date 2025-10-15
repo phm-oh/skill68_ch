@@ -47,8 +47,8 @@ const validateCommitteeEvaluation = [
   
   body('committee_score')
     .optional()
-    .isFloat({ min: 0, max: 4 })
-    .withMessage('คะแนนต้องอยู่ในช่วง 0-4'),
+    .isFloat({ min: 0, max: 400 })  // ✅ แก้เป็น 400
+    .withMessage('คะแนนต้องอยู่ในช่วง 0-400'),
   
   body('committee_comment')
     .optional()
@@ -57,6 +57,7 @@ const validateCommitteeEvaluation = [
   
   handleValidationErrors
 ];
+console.log('✅ Validation loaded: committee_score max = 400');
 
 // ====== EVALUATEE ROUTES ======
 

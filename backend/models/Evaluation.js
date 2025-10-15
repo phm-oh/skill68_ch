@@ -158,40 +158,58 @@ class Evaluation {
   }
 
   // ประเมินโดยกรรมการ
-  static async evaluateByCommittee(data) {
-    const {
+ // ประเมินโดยกรรมการ
+static async evaluateByCommittee(data) {
+  const {
+    evaluation_id,
+    committee_selected_option_id,
+    committee_score,
+    committee_comment,
+    committee_evaluated_by
+  } = data;
+
+  try {
+    // 🔍 Debug: ดูข้อมูลที่จะ UPDATE
+    console.log('🔍 Evaluating:', {
       evaluation_id,
       committee_selected_option_id,
       committee_score,
       committee_comment,
       committee_evaluated_by
-    } = data;
+    });
 
-    try {
-      const [result] = await db.execute(`
-        UPDATE user_evaluations 
-        SET 
-          committee_selected_option_id = ?,
-          committee_score = ?,
-          committee_comment = ?,
-          committee_evaluated_by = ?,
-          status = 'evaluated',
-          evaluated_at = NOW(),
-          updated_at = NOW()
-        WHERE id = ? AND status = 'submitted'
-      `, [
-        committee_selected_option_id,
-        committee_score,
-        committee_comment || null,
-        committee_evaluated_by,
-        evaluation_id
-      ]);
+    const [result] = await db.execute(`
+      UPDATE user_evaluations 
+      SET 
+        committee_selected_option_id = ?,
+        committee_score = ?,
+        committee_comment = ?,
+        committee_evaluated_by = ?,
+        status = 'evaluated',
+        evaluated_at = NOW(),
+        updated_at = NOW()
+      WHERE id = ?
+    `, [
+      committee_selected_option_id,
+      committee_score,
+      committee_comment || null,
+      committee_evaluated_by,
+      evaluation_id
+    ]);
 
-      return result.affectedRows > 0;
-    } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการประเมินโดยกรรมการ: ' + error.message);
-    }
+    // 🔍 Debug: ดูผลลัพธ์
+    console.log('✅ Update result:', {
+      affectedRows: result.affectedRows,
+      changedRows: result.changedRows,
+      info: result.info
+    });
+
+    return result.affectedRows > 0;
+  } catch (error) {
+    console.error('SQL Error:', error);
+    throw new Error('เกิดข้อผิดพลาดในการประเมินโดยกรรมการ: ' + error.message);
   }
+}
 
   // อนุมัติการประเมิน
   static async approve(evaluationIds, approvedBy) {

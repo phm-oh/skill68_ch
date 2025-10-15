@@ -1,5 +1,5 @@
-// Path: frontend-viteV2/src/services/committeeService.js
-// Service สำหรับเรียก API ระบบกรรมการ
+// frontend-viteV2/src/services/committeeService.js
+// Service สำหรับเรียก API ระบบกรรมการ (แก้ไขแล้ว)
 
 import axios from 'axios'
 
@@ -42,20 +42,42 @@ const committeeService = {
     }
   },
 
-  // บันทึกคะแนนประเมิน (แก้แล้ว - ส่ง field name ตรงกับ Backend)
+  // บันทึกคะแนนประเมิน (แก้ใหม่ - เพิ่ม validation และ error handling)
   async saveEvaluation(evaluationId, data) {
     try {
+      // ตรวจสอบข้อมูลก่อนส่ง
+      if (!evaluationId) {
+        throw new Error('ไม่พบ evaluation_id')
+      }
+
+      if (!data.selectedOptionId) {
+        throw new Error('กรุณาเลือกคะแนน')
+      }
+
+      if (data.score === null || data.score === undefined) {
+        throw new Error('ไม่พบคะแนน')
+      }
+
       const url = `${API_BASE}/evaluations/committee/${evaluationId}`
       
       console.log('💾 Saving evaluation ID:', evaluationId)
       
-      // ✅ ส่ง field name ตรงกับที่ Backend ต้องการ
+      // แปลงเป็น Number และ validate
       const payload = {
-        committee_selected_option_id: data.selectedOptionId,
-        committee_score: data.score,
-        committee_comment: data.comment || ''
+        committee_selected_option_id: Number(data.selectedOptionId),
+        committee_score: Number(data.score),
+        committee_comment: (data.comment || '').trim() || ''
       }
       
+      // ตรวจสอบค่าที่ส่ง
+      if (isNaN(payload.committee_selected_option_id) || payload.committee_selected_option_id <= 0) {
+        throw new Error('รหัสตัวเลือกไม่ถูกต้อง')
+      }
+
+      if (isNaN(payload.committee_score) || payload.committee_score < 0) {
+        throw new Error('คะแนนไม่ถูกต้อง')
+      }
+
       console.log('📦 Payload:', payload)
       
       const response = await axios.post(url, payload, {
@@ -71,7 +93,9 @@ const committeeService = {
     } catch (error) {
       console.error('❌ Error saving evaluation:', error)
       console.error('❌ Response:', error.response?.data)
-      throw new Error(error.response?.data?.message || 'ไม่สามารถบันทึกการประเมินได้')
+      
+      const errorMsg = error.response?.data?.message || error.message || 'ไม่สามารถบันทึกการประเมินได้'
+      throw new Error(errorMsg)
     }
   },
 
