@@ -1,13 +1,7 @@
-<!-- 
-  Path: frontend-viteV2/src/components/hr/DepartmentTable.vue
-  ตารางแสดงสถิติแต่ละแผนก
-  สร้างไฟล์ใหม่
--->
-
 <template>
   <div>
     <!-- ตารางแสดงข้อมูล -->
-    <v-table v-if="data && data.length > 0" density="comfortable">
+    <v-table v-if="filteredData && filteredData.length > 0" density="comfortable">
       <thead>
         <tr>
           <th class="text-left">แผนก</th>
@@ -18,23 +12,27 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="dept in data" :key="dept.department">
-          <td class="font-weight-medium">{{ dept.department }}</td>
+        <tr v-for="dept in filteredData" :key="dept.department">
+          <td class="font-weight-medium">{{ dept.department || 'ไม่ระบุ' }}</td>
           <td class="text-center">{{ dept.total_users }} คน</td>
+          
+          <!-- ✅ คะแนนเฉลี่ย - ไม่มี % -->
           <td class="text-center">
             <v-chip 
               :color="getScoreColor(dept.average_score)"
               size="small"
               variant="flat"
             >
-              {{ dept.average_score?.toFixed(2) || '-' }}
+              {{ formatScore(dept.average_score) }}
             </v-chip>
           </td>
+          
+          <!-- ✅ อัตราส่งงาน - มี % -->
           <td class="text-center">
             <div class="d-flex align-center justify-center">
-              <span class="mr-2">{{ dept.completion_rate?.toFixed(0) || 0 }}%</span>
+              <span class="mr-2">{{ formatPercentage(dept.completion_rate) }}%</span>
               <v-progress-linear
-                :model-value="dept.completion_rate || 0"
+                :model-value="parseFloat(dept.completion_rate) || 0"
                 :color="getProgressColor(dept.completion_rate)"
                 height="6"
                 rounded
@@ -42,6 +40,7 @@
               />
             </div>
           </td>
+          
           <td class="text-center">
             <v-chip
               :color="getStatusColor(dept.completion_rate)"
@@ -73,34 +72,63 @@ export default {
       default: () => []
     }
   },
+
+  computed: {
+    // ✅ กรองแผนกที่ไม่มีชื่อออก
+    filteredData() {
+      return this.data.filter(dept => dept.department && dept.department.trim() !== '')
+    }
+  },
   
   methods: {
+    // ✅ Format คะแนนเฉลี่ย (ไม่มี %)
+    formatScore(score) {
+      if (!score || score === null) return '-'
+      const num = parseFloat(score)
+      return isNaN(num) ? '-' : num.toFixed(2)
+    },
+
+    // ✅ Format เปอร์เซ็นต์ (มี % อยู่แล้วใน template)
+    formatPercentage(rate) {
+      if (!rate || rate === null) return '0'
+      const num = parseFloat(rate)
+      return isNaN(num) ? '0' : num.toFixed(0)
+    },
+    
     getScoreColor(score) {
-      if (!score) return 'grey'
-      if (score >= 90) return 'green'
-      if (score >= 80) return 'blue'
-      if (score >= 70) return 'orange'
+      if (!score || score === null) return 'grey'
+      const num = parseFloat(score)
+      if (isNaN(num)) return 'grey'
+      if (num >= 90) return 'green'
+      if (num >= 80) return 'blue'
+      if (num >= 70) return 'orange'
       return 'red'
     },
     
     getProgressColor(rate) {
       if (!rate) return 'grey'
-      if (rate >= 90) return 'green'
-      if (rate >= 70) return 'orange'
+      const num = parseFloat(rate)
+      if (isNaN(num)) return 'grey'
+      if (num >= 90) return 'green'
+      if (num >= 70) return 'orange'
       return 'red'
     },
     
     getStatusColor(rate) {
       if (!rate) return 'grey'
-      if (rate >= 90) return 'success'
-      if (rate >= 70) return 'warning'
+      const num = parseFloat(rate)
+      if (isNaN(num)) return 'grey'
+      if (num >= 90) return 'success'
+      if (num >= 70) return 'warning'
       return 'error'
     },
     
     getStatusText(rate) {
       if (!rate) return 'ไม่มีข้อมูล'
-      if (rate >= 90) return 'ดีเยี่ยม'
-      if (rate >= 70) return 'ดี'
+      const num = parseFloat(rate)
+      if (isNaN(num)) return 'ไม่มีข้อมูล'
+      if (num >= 90) return 'ดีเยี่ยม'
+      if (num >= 70) return 'ดี'
       return 'ต้องปรับปรุง'
     }
   }

@@ -21,12 +21,8 @@
     <!-- Navigation Drawer -->
     <v-navigation-drawer permanent>
       <v-list>
-        <v-list-item
-          v-for="item in menuItems"
-          :key="item.title"
-          @click="currentTab = item.value"
-          :class="{ 'v-list-item--active': currentTab === item.value }"
-        >
+        <v-list-item v-for="item in menuItems" :key="item.title" @click="currentTab = item.value"
+          :class="{ 'v-list-item--active': currentTab === item.value }">
           <template v-slot:prepend>
             <v-icon>{{ item.icon }}</v-icon>
           </template>
@@ -41,20 +37,13 @@
         <!-- ✅ เพิ่มส่วนนี้ - Dashboard ภาพรวม (ใหม่!) -->
         <div v-if="currentTab === 'overview'">
           <h1 class="text-h4 mb-4">📊 ภาพรวมระบบ</h1>
-          
+
           <!-- เลือกรอบการประเมิน -->
           <v-row>
             <v-col cols="12" md="4">
-              <v-select
-                v-model="selectedPeriod"
-                :items="periods"
-                item-title="period_name"
-                item-value="id"
-                label="เลือกรอบการประเมิน"
-                variant="outlined"
-                density="comfortable"
-                @update:model-value="loadDashboard"
-              />
+              <v-select v-model="selectedPeriod" :items="periods" item-title="period_name" item-value="id"
+                label="เลือกรอบการประเมิน" variant="outlined" density="comfortable"
+                @update:model-value="loadDashboard" />
             </v-col>
           </v-row>
 
@@ -79,14 +68,8 @@
                       <div class="text-h5 font-weight-bold">{{ stat.value }}</div>
                     </div>
                   </div>
-                  <v-progress-linear
-                    v-if="stat.progress !== undefined"
-                    :model-value="stat.progress"
-                    :color="stat.color"
-                    height="8"
-                    rounded
-                    class="mt-2"
-                  />
+                  <v-progress-linear v-if="stat.progress !== undefined" :model-value="stat.progress" :color="stat.color"
+                    height="8" rounded class="mt-2" />
                 </v-card>
               </v-col>
             </v-row>
@@ -248,7 +231,7 @@ export default {
     // ✅ เพิ่ม computed properties
     summaryStats() {
       if (!this.dashboardData || !this.dashboardData.statistics) return []
-      
+
       const stats = this.dashboardData.statistics
       return [
         {
@@ -273,20 +256,27 @@ export default {
         },
         {
           title: 'คะแนนเฉลี่ย',
-          value: stats.average_score ? stats.average_score.toFixed(2) : '-',
+          value: stats.average_score || '-',
           icon: 'mdi-chart-line',
           color: 'purple'
         }
       ]
     },
     chartData() {
+      console.log('🎨 Computing chartData from:', this.dashboardData)
+
       if (!this.dashboardData) {
+        console.warn('⚠️ dashboardData is null/undefined')
         return { topics: [], distribution: [] }
       }
-      return {
+
+      const result = {
         topics: this.dashboardData.topic_analysis || [],
         distribution: this.dashboardData.score_distribution || []
       }
+
+      console.log('✅ chartData result:', result)
+      return result
     }
   },
   async mounted() {
@@ -311,7 +301,7 @@ export default {
       try {
         const response = await periodService.getPeriods()
         this.periods = response.data || []
-        
+
         if (this.periods.length > 0) {
           const activePeriod = this.periods.find(p => p.is_active)
           this.selectedPeriod = activePeriod?.id || this.periods[0].id
@@ -323,14 +313,47 @@ export default {
     },
     async loadDashboard() {
       if (!this.selectedPeriod) return
-      
+
       this.loadingDashboard = true
       try {
-        // ใช้ API ที่มีอยู่แล้ว
-        const response = await reportService.getPeriodSummary(this.selectedPeriod)
-        this.dashboardData = response.data
+        console.log('📊 Loading dashboard for period:', this.selectedPeriod)
+
+        const response = await reportService.getStatistics(this.selectedPeriod)
+
+        console.log('✅ Dashboard response:', response)
+        console.log('✅ Response structure:', {
+          hasSuccess: !!response.success,
+          hasData: !!response.data,
+          dataKeys: response.data ? Object.keys(response.data) : []
+        })
+
+        // ✅ ตรวจสอบ structure แล้วดึงข้อมูลที่ถูกต้อง
+        if (response && response.success) {
+          // ✅ ถ้า response.data มี statistics, topic_analysis อยู่ภายใน
+          if (response.data && response.data.statistics) {
+            this.dashboardData = response.data
+            console.log('✅ Dashboard data set (nested):', this.dashboardData)
+          }
+          // ✅ ถ้า response มี statistics อยู่ที่ root level
+          else if (response.statistics) {
+            this.dashboardData = response
+            console.log('✅ Dashboard data set (flat):', this.dashboardData)
+          }
+          else {
+            console.error('❌ Cannot find statistics in response:', response)
+            this.dashboardData = null
+          }
+
+          // Debug
+          console.log('📊 Final dashboardData:', this.dashboardData)
+          console.log('📊 Topic analysis:', this.dashboardData?.topic_analysis)
+          console.log('📉 Score distribution:', this.dashboardData?.score_distribution)
+        } else {
+          console.error('❌ Invalid response:', response)
+          this.dashboardData = null
+        }
       } catch (error) {
-        console.error('Load dashboard error:', error)
+        console.error('❌ Load dashboard error:', error)
         this.dashboardData = null
       } finally {
         this.loadingDashboard = false

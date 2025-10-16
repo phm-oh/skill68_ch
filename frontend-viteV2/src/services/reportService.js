@@ -1,6 +1,5 @@
 // Path: frontend-viteV2/src/services/reportService.js
 // Service สำหรับเรียก API รายงานและสถิติ
-// สร้างไฟล์ใหม่
 
 import axios from 'axios'
 
@@ -67,26 +66,29 @@ const reportService = {
     }
   },
 
-  // สถิติการประเมิน
+  // ✅ สถิติการประเมิน (ใช้อันนี้!)
   async getStatistics(periodId) {
     try {
+      console.log('📊 Calling getStatistics API for period:', periodId)
+      
       const response = await api.get(`/reports/statistics/${periodId}`)
+      
+      console.log('✅ Statistics response:', response.data)
+      
       return response.data
     } catch (error) {
       console.error('❌ Get statistics error:', error)
+      console.error('Error details:', error.response?.data || error.message)
       throw error
     }
   },
 
-  // สรุปการประเมินในรอบ (API เดิมที่มีอยู่แล้ว)
+  // ⚠️ Deprecated - ใช้ getStatistics() แทน
   async getPeriodSummary(periodId) {
-    try {
-      const response = await api.get(`/evaluations/period/${periodId}/summary`)
-      return response.data
-    } catch (error) {
-      console.error('❌ Get period summary error:', error)
-      throw error
-    }
+    console.warn('⚠️ getPeriodSummary is DEPRECATED! Use getStatistics() instead')
+    
+    // Redirect ไป getStatistics แทน
+    return this.getStatistics(periodId)
   }
 }
 

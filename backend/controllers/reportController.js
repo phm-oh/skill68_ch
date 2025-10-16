@@ -10,7 +10,7 @@ const getUserReport = async (req, res) => {
     const { userId, periodId } = req.params;
 
     const report = await Report.generateUserReport(userId, periodId);
-    
+
     if (!report) {
       return notFound(res, 'ไม่พบข้อมูลการประเมินของผู้ใช้ในรอบนี้');
     }
@@ -34,7 +34,7 @@ const getPeriodReport = async (req, res) => {
     const { format } = req.query; // json, pdf, excel
 
     const report = await Report.generatePeriodReport(periodId);
-    
+
     if (!report) {
       return notFound(res, 'ไม่พบข้อมูลการประเมินในรอบนี้');
     }
@@ -71,7 +71,7 @@ const getDepartmentReport = async (req, res) => {
     const { department, periodId } = req.params;
 
     const report = await Report.generateDepartmentReport(department, periodId);
-    
+
     if (!report || report.users.length === 0) {
       return notFound(res, 'ไม่พบข้อมูลการประเมินของแผนกนี้');
     }
@@ -100,7 +100,7 @@ const getComparisonReport = async (req, res) => {
     }
 
     const report = await Report.generateComparisonReport(period1, period2, users);
-    
+
     return success(res, {
       comparison_report: report,
       period_1: period1,
@@ -118,15 +118,19 @@ const getStatisticsReport = async (req, res) => {
   try {
     const { periodId } = req.params;
 
+    console.log('📊 Getting statistics for period:', periodId);
+
     const stats = await Report.generateStatistics(periodId);
-    
-    return success(res, {
-      statistics: stats,
-      period_id: periodId
-    }, 'สร้างรายงานสถิติสำเร็จ');
+
+    console.log('✅ Stats keys:', Object.keys(stats));
+    console.log('✅ Has topic_analysis:', !!stats.topic_analysis);
+    console.log('✅ Has score_distribution:', !!stats.score_distribution);
+
+    // ✅ ส่ง stats ทั้งก้อน (มี statistics, topic_analysis, score_distribution, department_summary)
+    return success(res, stats, 'สร้างรายงานสถิติสำเร็จ');
 
   } catch (err) {
-    console.error('Get statistics report error:', err);
+    console.error('❌ Get statistics report error:', err);
     return error(res, 'เกิดข้อผิดพลาดในการสร้างรายงานสถิติ');
   }
 };
@@ -137,7 +141,7 @@ const getCommitteeReport = async (req, res) => {
     const { committeeId, periodId } = req.params;
 
     const report = await Report.generateCommitteeReport(committeeId, periodId);
-    
+
     if (!report) {
       return notFound(res, 'ไม่พบข้อมูลการประเมินของกรรมการในรอบนี้');
     }
@@ -165,7 +169,7 @@ const getCustomReport = async (req, res) => {
     }
 
     const report = await Report.generateCustomReport(filters);
-    
+
     return success(res, {
       custom_report: report,
       filters: filters
@@ -206,7 +210,7 @@ const downloadReport = async (req, res) => {
 
     // Export ตาม format
     let buffer, contentType, extension;
-    
+
     switch (format) {
       case 'pdf':
         buffer = await Report.exportToPDF(report);

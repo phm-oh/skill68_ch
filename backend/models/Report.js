@@ -173,58 +173,140 @@ class Report {
   // สร้างรายงานสถิติ
   static async generateStatistics(periodId) {
     try {
-      // สถิติพื้นฐาน
-      const [basic] = await db.execute(`
-        SELECT 
-          COUNT(DISTINCT ue.user_id) as total_users,
-          COUNT(*) as total_evaluations,
-          AVG(ue.committee_score) as average_score,
-          COUNT(CASE WHEN ue.status = 'draft' THEN 1 END) as draft_count,
-          COUNT(CASE WHEN ue.status = 'submitted' THEN 1 END) as submitted_count,
-          COUNT(CASE WHEN ue.status = 'evaluated' THEN 1 END) as evaluated_count,
-          COUNT(CASE WHEN ue.status = 'approved' THEN 1 END) as approved_count
-        FROM user_evaluations ue
-        WHERE ue.period_id = ?
-      `, [periodId]);
+      console.log('📊 Generating statistics for period:', periodId);
 
-      // สถิติแยกตามแผนก
-      const [departments] = await db.execute(`
-        SELECT 
-          u.department,
-          COUNT(DISTINCT u.id) as user_count,
-          AVG(ue.committee_score) as avg_score
-        FROM users u
-        JOIN user_evaluations ue ON u.id = ue.user_id
-        WHERE ue.period_id = ? AND ue.status IN ('evaluated', 'approved')
-        GROUP BY u.department
-        ORDER BY avg_score DESC
-      `, [periodId]);
+      // 1. สถิติผู้ใช้พื้นฐาน
+      const [userStats] = await db.execute(`
+      SELECT 
+        COUNT(DISTINCT CASE WHEN u.role = 'evaluatee' THEN u.id END) as total_users,
+        COUNT(DISTINCT CASE WHEN ue.status = 'submitted' THEN ue.user_id END) as submitted_users,
+        COUNT(DISTINCT CASE WHEN ue.status IN ('evaluated', 'approved') THEN ue.user_id END) as evaluated_users
+      FROM users u
+      LEFT JOIN user_evaluations ue ON u.id = ue.user_id AND ue.period_id = ?
+      WHERE u.role = 'evaluatee'
+    `, [periodId]);
 
-      // การกระจายคะแนน
-      const [distribution] = await db.execute(`
-        SELECT 
-          CASE 
-            WHEN ue.committee_score >= 3.5 THEN 'ดีเยี่ยม (3.5-4.0)'
-            WHEN ue.committee_score >= 3.0 THEN 'ดี (3.0-3.4)'
-            WHEN ue.committee_score >= 2.5 THEN 'พอใช้ (2.5-2.9)'
-            WHEN ue.committee_score >= 2.0 THEN 'ต้องปรับปรุง (2.0-2.4)'
-            ELSE 'ไม่ผ่านเกณฑ์ (<2.0)'
-          END as grade_range,
-          COUNT(*) as count
-        FROM user_evaluations ue
-        WHERE ue.period_id = ? AND ue.status IN ('evaluated', 'approved')
-        GROUP BY grade_range
-        ORDER BY MIN(ue.committee_score) DESC
-      `, [periodId]);
+      console.log('👥 User stats:', userStats[0]);
 
-      return {
-        basic_stats: basic[0],
-        department_stats: departments,
-        score_distribution: distribution,
+      // 2. คำนวณคะแนนเฉลี่ย (ต้องคูณ weight_score!)
+      const [scoreStats] = await db.execute(`
+      SELECT 
+        AVG(ue.committee_score * ec.weight_score) as average_score,
+        MIN(ue.committee_score * ec.weight_score) as min_score,
+        MAX(ue.committee_score * ec.weight_score) as max_score
+      FROM user_evaluations ue
+      JOIN evaluation_criteria ec ON ue.criteria_id = ec.id
+      WHERE ue.period_id = ? 
+        AND ue.status IN ('evaluated', 'approved')
+        AND ue.committee_score IS NOT NULL
+    `, [periodId]);
+
+      console.log('📈 Score stats:', scoreStats[0]);
+
+      // 3. วิเคราะห์คะแนนแต่ละหัวข้อ (สำหรับกราฟ) - ✅ ลบ ec.sort_order
+      const [topicAnalysis] = await db.execute(`
+      SELECT 
+        et.topic_name,
+        et.weight_percentage,
+        AVG(ue.self_score * ec.weight_score) as average_self_score,
+        AVG(ue.committee_score * ec.weight_score) as average_committee_score,
+        COUNT(DISTINCT ue.user_id) as total_users
+      FROM evaluation_topics et
+      JOIN evaluation_criteria ec ON et.id = ec.topic_id
+      LEFT JOIN user_evaluations ue ON ec.id = ue.criteria_id AND ue.period_id = ?
+      WHERE et.period_id = ?
+      GROUP BY et.id, et.topic_name, et.weight_percentage, et.sort_order
+      ORDER BY et.sort_order ASC
+    `, [periodId, periodId]);
+
+      console.log('📊 Topic analysis:', topicAnalysis);
+
+      // 4. การกระจายคะแนน (Score Distribution)
+      const [scoreDistribution] = await db.execute(`
+      SELECT 
+        CASE 
+          WHEN ue.committee_score >= 3.5 THEN '3.5-4.0'
+          WHEN ue.committee_score >= 3.0 THEN '3.0-3.4'
+          WHEN ue.committee_score >= 2.5 THEN '2.5-2.9'
+          WHEN ue.committee_score >= 2.0 THEN '2.0-2.4'
+          ELSE '< 2.0'
+        END as score_range,
+        CASE 
+          WHEN ue.committee_score >= 3.5 THEN '3.5-4.0'
+          WHEN ue.committee_score >= 3.0 THEN '3.0-3.4'
+          WHEN ue.committee_score >= 2.5 THEN '2.5-2.9'
+          WHEN ue.committee_score >= 2.0 THEN '2.0-2.4'
+          ELSE '< 2.0'
+        END as \`range\`,
+        COUNT(*) as count
+      FROM user_evaluations ue
+      WHERE ue.period_id = ? 
+        AND ue.status IN ('evaluated', 'approved')
+        AND ue.committee_score IS NOT NULL
+      GROUP BY score_range, \`range\`
+      ORDER BY MIN(ue.committee_score) DESC
+    `, [periodId]);
+
+      console.log('📉 Score distribution:', scoreDistribution);
+
+      // 5. สถิติแต่ละแผนก (สำหรับตาราง)
+      const [departmentSummary] = await db.execute(`
+      SELECT 
+        u.department,
+        COUNT(DISTINCT u.id) as total_users,
+        AVG(ue.committee_score * ec.weight_score) as average_score,
+        COUNT(DISTINCT CASE WHEN ue.status IN ('evaluated', 'approved') THEN ue.user_id END) as evaluated_users,
+        (COUNT(DISTINCT CASE WHEN ue.status IN ('evaluated', 'approved') THEN ue.user_id END) / COUNT(DISTINCT u.id) * 100) as completion_rate
+      FROM users u
+      LEFT JOIN user_evaluations ue ON u.id = ue.user_id AND ue.period_id = ?
+      LEFT JOIN evaluation_criteria ec ON ue.criteria_id = ec.id
+      WHERE u.role = 'evaluatee'
+      GROUP BY u.department
+      HAVING u.department IS NOT NULL
+      ORDER BY u.department ASC
+    `, [periodId]);
+
+      console.log('🏢 Department summary:', departmentSummary);
+
+      // คำนวณ completion_rate และ evaluation_rate
+      const completionRate = userStats[0].total_users > 0
+        ? (userStats[0].submitted_users / userStats[0].total_users * 100).toFixed(2)
+        : '0.00';
+
+      const evaluationRate = userStats[0].total_users > 0
+        ? (userStats[0].evaluated_users / userStats[0].total_users * 100).toFixed(2)
+        : '0.00';
+
+      // คำนวณ percentage สำหรับ score_distribution
+      const totalDistribution = scoreDistribution.reduce((sum, item) => sum + item.count, 0);
+      const distributionWithPercentage = scoreDistribution.map(item => ({
+        ...item,
+        percentage: totalDistribution > 0 ? (item.count / totalDistribution * 100) : 0
+      }));
+
+      const result = {
+        statistics: {
+          total_users: userStats[0].total_users || 0,
+          submitted_users: userStats[0].submitted_users || 0,
+          evaluated_users: userStats[0].evaluated_users || 0,
+          completion_rate: completionRate,
+          evaluation_rate: evaluationRate,
+          average_score: scoreStats[0].average_score ? parseFloat(scoreStats[0].average_score).toFixed(2) : null,
+          min_score: scoreStats[0].min_score || null,
+          max_score: scoreStats[0].max_score || null
+        },
+        topic_analysis: topicAnalysis,
+        score_distribution: distributionWithPercentage,
+        department_summary: departmentSummary,
         generated_at: new Date()
       };
+
+      console.log('✅ Final statistics result:', JSON.stringify(result, null, 2));
+
+      return result;
     } catch (error) {
-      throw new Error('เกิดข้อผิดพลาดในการสร้างรายงานสถิติ: ' + error.message);
+      console.error('❌ Generate statistics error:', error);
+      throw new Error('เกิดข้อผิดพลาดในการสร้างสถิติ: ' + error.message);
     }
   }
 
@@ -259,7 +341,7 @@ class Report {
       `, [committeeId, periodId]);
 
       // แก้ไขการใช้ eval -> ใช้ evaluation แทน
-      const evaluationAverage = evaluations.length > 0 
+      const evaluationAverage = evaluations.length > 0
         ? evaluations.reduce((sum, evaluation) => sum + parseFloat(evaluation.average_score || 0), 0) / evaluations.length
         : 0;
 
@@ -282,7 +364,7 @@ class Report {
     try {
       let userCondition = '';
       let params = [period1, period2];
-      
+
       if (userIds && userIds.length > 0) {
         userCondition = `AND u.id IN (${userIds.map(() => '?').join(',')})`;
         params.push(...userIds);
@@ -397,7 +479,7 @@ class Report {
       // ใช้ library เช่น puppeteer หรือ jsPDF
       // สำหรับการแข่งขัน 7 ชั่วโมง อาจส่งแค่ JSON หรือใช้ HTML template
       const html = this.generateHTMLReport(reportData);
-      
+
       // Placeholder: จริงๆ ต้องใช้ puppeteer แปลง HTML เป็น PDF
       return Buffer.from(html, 'utf8');
     } catch (error) {
@@ -465,7 +547,7 @@ class Report {
       });
       return csv;
     }
-    
+
     if (reportData.results) {
       // รายงานกำหนดเอง
       let csv = 'ชื่อ-นามสกุล,แผนก,ตำแหน่ง,รอบการประเมิน,คะแนนเฉลี่ย\n';
