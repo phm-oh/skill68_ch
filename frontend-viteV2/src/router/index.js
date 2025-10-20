@@ -37,6 +37,12 @@ const routes = [
     component: () => import('@/views/hr/Dashboard.vue'),
     meta: { requiresAuth: true, role: 'hr' }
   },
+  {
+    path: '/hr/reports',
+    name: 'Reports',
+    component: () => import('@/components/hr/ReportPage.vue'),
+    meta: { requiresAuth: true, role: 'hr' }
+  },
 
   // ============= EVALUATEE ROUTES =============
   {
@@ -109,7 +115,7 @@ router.beforeEach((to, from, next) => {
 // เพิ่ม Error Handler
 router.onError((error) => {
   console.error('❌ Router Error:', error)
-  
+
   // ถ้าเป็น error จากการโหลด component (chunk loading error)
   if (error.message.includes('Failed to fetch dynamically imported module')) {
     // Reload หน้าเว็บใหม่

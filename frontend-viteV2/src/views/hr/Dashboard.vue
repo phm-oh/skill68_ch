@@ -153,18 +153,8 @@
         </div>
 
         <!-- Reports -->
-        <div v-if="currentTab === 'reports'">
-          <v-card>
-            <v-card-title>
-              <v-icon class="mr-2">mdi-chart-bar</v-icon>
-              รายงานและสถิติ
-            </v-card-title>
-            <v-card-text>
-              <v-alert type="info">
-                <strong>กำลังพัฒนา:</strong> หน้ารายงานจะพร้อมใช้งานเร็วๆ นี้
-              </v-alert>
-            </v-card-text>
-          </v-card>
+        <div v-if="currentTab === 'reports'">              
+          <ReportPage />
         </div>
       </v-container>
     </v-main>
@@ -184,6 +174,7 @@ import DepartmentTable from '@/components/hr/DepartmentTable.vue'
 import periodService from '../../services/periodService.js'
 import userService from '../../services/userService.js'
 import reportService from '../../services/reportService.js'
+import ReportPage from '@/components/hr/ReportPage.vue'
 
 
 export default {
@@ -196,7 +187,8 @@ export default {
     // ✅ เพิ่ม components ใหม่
     TopicScoresChart,
     ScoreDistributionChart,
-    DepartmentTable
+    DepartmentTable,
+    ReportPage
   },
   data() {
     return {
